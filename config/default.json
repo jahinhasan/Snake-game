@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "board": {
+    "width": 24,
+    "height": 18,
+    "min_width": 10,
+    "min_height": 10,
+    "max_width": 40,
+    "max_height": 30
+  },
+  "game": {
+    "moves_per_second": 10,
+    "min_moves_per_second": 2,
+    "max_moves_per_second": 30,
+    "max_foods": 4,
+    "time_limit_seconds": 300,
+    "seed": null
+  },
+  "window": {
+    "width": 1280,
+    "height": 800,
+    "min_width": 1024,
+    "min_height": 680,
+    "fullscreen": false,
+    "fps_counter": true
+  },
+  "audio": {
+    "enabled": true,
+    "volume": 0.75
+  },
+  "visual": {
+    "show_grid": true,
+    "show_path": true,
+    "show_danger": true,
+    "show_target": true,
+    "show_rejected": true,
+    "show_qvalues": true,
+    "smooth_movement": true
+  },
+  "agent": {
+    "type": "astar",
+    "opponent_type": "rule_based",
+    "rl_checkpoint": "models/dqn_default.pt"
+  },
+  "llm": {
+    "enabled": false,
+    "host": "http://127.0.0.1:11434",
+    "model": "qwen3:4b",
+    "timeout_seconds": 8.0,
+    "connection_timeout_seconds": 2.5,
+    "min_interval_seconds": 3.0,
+    "max_retries": 1,
+    "temperature": 0.4,
+    "max_tokens": 220,
+    "analysis_max_tokens": 500
+  },
+  "rl": {
+    "hidden_sizes": [
+      128,
+      128
+    ],
+    "gamma": 0.9,
+    "learning_rate": 0.0005,
+    "buffer_size": 50000,
+    "batch_size": 64,
+    "target_update_steps": 1000,
+    "train_every_steps": 1,
+    "eps_start": 1.0,
+    "eps_end": 0.05,
+    "eps_decay_steps": 25000,
+    "double_dqn": true,
+    "max_episode_steps": 1200,
+    "reward": {
+      "food_scale": 0.1,
+      "trap_penalty": -2.0,
+      "death_wall": -10.0,
+      "death_self": -10.0,
+      "death_opponent": -10.0,
+      "step_cost": 0.0,
+      "progress_scale": 0.12,
+      "stagnation_start_steps": 120,
+      "stagnation_penalty": 0.02,
+      "win_bonus": 5.0
+    }
+  },
+  "safety": {
+    "dead_end_check": true,
+    "min_escape_area_factor": 1.0,
+    "flood_fill_limit": 900
+  },
+  "decision": {
+    "hybrid": {
+      "w_rl": 0.55,
+      "w_path": 0.3,
+      "w_space": 0.15
+    },
+    "astar": {
+      "turn_penalty": 0.02,
+      "risk_aversion": 0.6,
+      "value_weight": 1.0,
+      "survival_escape_ratio": 1.1
+    }
+  },
+  "benchmark": {
+    "episodes_per_agent": 20,
+    "llm_episodes_per_agent": 5,
+    "board_preset": "default",
+    "base_seed": 1000,
+    "max_ticks_per_episode": 1500,
+    "agents": [
+      "rule_based",
+      "astar",
+      "bfs",
+      "rl",
+      "llm_astar",
+      "llm_rl",
+      "hybrid"
+    ]
+  },
+  "training": {
+    "episodes": 400,
+    "eval_episodes": 20,
+    "eval_every_episodes": 50,
+    "board_width": 20,
+    "board_height": 15,
+    "checkpoint_name": "dqn_default.pt",
+    "autosave_every_episodes": 50
+  }
+}

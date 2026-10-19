@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime data (keep directory structure via .gitkeep, ignore contents)
+data/*
+!data/.gitkeep
+data/benchmarks/*
+data/history/*
+data/logs/*
+models/*
+!models/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Environment
+.env
+
+# Packaged binaries
+build_snake_arena/
+*.spec

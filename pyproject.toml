@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snake-arena"
+version = "1.0.0"
+description = "LLM-Enhanced Intelligent Snake Arena - a university AI sessional project combining A*, BFS, DQN reinforcement learning, and a local Ollama/Qwen3 strategic planner inside a polished Pygame arena."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Snake Arena Project" }]
+keywords = ["snake", "reinforcement-learning", "astar", "dqn", "ollama", "pygame"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pygame>=2.5",
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "torch>=2.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+snake-arena = "snake_arena.app:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning:pygame.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

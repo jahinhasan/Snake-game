@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "description": "Food type definitions for the Snake Arena. Spawn probabilities are normalized at load time if they do not sum to 1. Lifetime is a [min, max] range in seconds, converted to game ticks using the current moves-per-second rate.",
+  "types": [
+    {
+      "name": "normal",
+      "display_name": "Normal",
+      "value": 10,
+      "risk": "low",
+      "probability": 0.55,
+      "lifetime_seconds": [25, 45],
+      "growth": 1,
+      "color": "#7ee787",
+      "shape": "circle",
+      "description": "Standard food. Low risk, modest reward."
+    },
+    {
+      "name": "bonus",
+      "display_name": "Bonus",
+      "value": 25,
+      "risk": "medium",
+      "probability": 0.20,
+      "lifetime_seconds": [14, 26],
+      "growth": 1,
+      "color": "#58a6ff",
+      "shape": "diamond",
+      "description": "Medium reward, expires faster than normal food."
+    },
+    {
+      "name": "golden",
+      "display_name": "Golden",
+      "value": 50,
+      "risk": "high",
+      "probability": 0.13,
+      "lifetime_seconds": [9, 16],
+      "growth": 1,
+      "color": "#e3b341",
+      "shape": "star",
+      "description": "High reward, short lifetime: reward/pursuit trade-off."
+    },
+    {
+      "name": "special",
+      "display_name": "Special",
+      "value": 100,
+      "risk": "very_high",
+      "probability": 0.07,
+      "lifetime_seconds": [6, 11],
+      "growth": 2,
+      "color": "#bc8cff",
+      "shape": "burst",
+      "description": "Very high reward, very short lifetime, grows the snake by 2."
+    },
+    {
+      "name": "trap",
+      "display_name": "Trap",
+      "value": -20,
+      "risk": "high",
+      "probability": 0.05,
+      "lifetime_seconds": [18, 30],
+      "growth": 0,
+      "color": "#f85149",
+      "shape": "skull",
+      "description": "Penalty food: -20 points on collection, no growth. Smart agents learn to route around it."
+    }
+  ]
+}

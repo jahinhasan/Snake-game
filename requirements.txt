@@ -1,0 +1,18 @@
+# Runtime dependencies for LLM-Enhanced Intelligent Snake Arena.
+#
+# PyTorch: the default PyPI wheel bundles CUDA support and is very large.
+# For a CPU-only install (recommended, and sufficient for this project) use:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# then `pip install -r requirements.txt` (torch will already be satisfied).
+# GPU acceleration is used automatically if a CUDA build is installed, but is
+# never required: everything trains and runs on CPU.
+
+# pygame-ce is the community-maintained drop-in replacement for pygame
+# (imported as `import pygame`). It is used because it ships prebuilt wheels
+# for current Python versions (e.g. 3.14) where classic pygame may not.
+pygame-ce>=2.5.6,<3.0
+numpy>=1.26,<3.0
+matplotlib>=3.8
+torch>=2.2
