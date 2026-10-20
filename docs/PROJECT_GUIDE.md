@@ -34,6 +34,7 @@ defending, or modifying the project. Everything here matches the real code in
    - 5.19 [Config system](#519-configpy--the-settings-system)
    - 5.20 [The UI](#520-the-ui--pygame-screens)
    - 5.21 [Entry points](#521-entry-points--mainpy--scripts)
+   - 5.22 [The bug-fix diary](#522-the-bug-fix-diary--true-stories-line-by-line) — real bugs fixed after launch, line by line
 6. **Every command, explained** ([section 6](#6-every-command-explained))
 7. [The tests](#7-the-tests)
 8. [How to change things (recipes)](#8-how-to-change-things-recipes)
@@ -97,12 +98,20 @@ this?"):
    game history.
 10. **UI** (`ui/`): App shell + widgets + 7 screens, all drawn with pygame
     (no image files — everything is drawn in code).
-11. **Tests** (`tests/`): 101 tests, written by verifying each module's real
-    API first. Writing them caught **two real bugs** (a food-spawning bug and
-    a wrong `pygame.time.Clock` name) — a good story about why tests matter.
+11. **Tests** (`tests/`): 104 tests, written by verifying each module's real
+    API first. Writing them caught **real bugs** (a food-spawning bug, a
+    wrong `pygame.time.Clock` name, three UI import errors, a checkpoint
+    saved to the wrong folder, and — after release — four more, see §5.22) —
+    a good story about why tests matter.
 12. **Docs** (`docs/` + `README.md`), **support scripts** (Linux + Windows),
-    and final verification: `--check` passes, benchmarks produce real
+    and final verification: `--check` was run, benchmarks produce real
     artifacts, a genuine 40-episode training run produced `models/dqn_default.pt`.
+13. **Real play-testing found four more bugs after "done"** — a frozen
+    game-over screen, a dead UP-arrow, the test suite silently turning the
+    LLM off in the saved config, and a crash in the health-check script.
+    Each got a line-by-line walkthrough in §5.22 and a regression test, so
+    it can never come back unnoticed. This is the normal life of real
+    software: you ship, you play, you fix, you re-test.
 
 Two honest notes that are part of the build story:
 - The environment's pygame had to be replaced with **pygame-ce** (see §3).
@@ -121,7 +130,7 @@ Two honest notes that are part of the build story:
 | **PyTorch 2.14 (CPU)** | Deep-learning framework | Builds and trains the DQN; runs on CPU by design (GPU optional). |
 | **NumPy** | Fast numeric arrays | The observation vector and replay buffer storage. |
 | **Matplotlib** | Plotting library | Training curves and benchmark charts (PNG). |
-| **pytest** | Testing framework | The 101 automated tests. |
+| **pytest** | Testing framework | The 104 automated tests. |
 | **Ollama + Qwen3 4B** | Local LLM server + model (optional) | The strategic planner. Runs on your machine, no API key, no internet. |
 | **urllib** (Python stdlib) | HTTP client | Talks to Ollama — no extra dependency needed. |
 | **dataclasses** (stdlib) | Auto-generated data classes | Clean structs: `Snake`, `Food`, `EpisodeRecord`… |
@@ -160,7 +169,7 @@ snake-game/
 │   ├── config.py            AppConfig: load/validate/save/clamp settings
 │   └── utils/               paths.py (where files live), logging_setup.py
 ├── scripts/                 headless CLIs: check_environment, train, benchmark
-├── tests/                   101 pytest tests (12 files)
+├── tests/                   104 pytest tests (12 files)
 ├── models/                  DQN checkpoints (models/dqn_default.pt)
 ├── data/                    runtime output (created on first run)
 │   ├── benchmarks/<run-id>/ results.json, summary.csv, records.csv, charts
@@ -170,6 +179,65 @@ snake-game/
 └── docs/                    ARCHITECTURE, AI_ALGORITHMS, RL_TRAINING,
                              EXPERIMENTS, WINDOWS_SETUP, REPORT, this guide
 ```
+
+### 4.1 File-by-file index — "which file, what's inside"
+
+Open any file below and you will find exactly what the table says.
+`src/snake_arena/` is ~8 900 lines of Python in total.
+
+**The game core (`src/snake_arena/game/`)**
+
+| File | What you'll find inside |
+|---|---|
+| `types.py` | The shared vocabulary: `Action` (UP=0, DOWN=1, LEFT=2, RIGHT=3 — remember these numbers, they matter in §5.22), `Cell` (x, y), `Snake`, `Food`, `GameState`, `TurnResult`. |
+| `snake.py` | The `Snake` class: body as a `deque` (fast add/remove at both ends), `is_reversal()`, `commit_move()` with `pending_growth` (grows 1 segment per tick). |
+| `collision.py` | `check_collisions()` — decides who dies (wall / self / opponent / head-on → both die), tail-vacating rule; `flood_count()` — counts reachable cells (the dead-end detector). |
+| `state.py` | `GameState`: board size, snakes, food list, tick counter, helpers `cell_occupied()` / `occupied_cells(include_food=...)`. |
+| `engine.py` | `GameEngine.step(actions)` — the 8-step referee routine (AI actions → move → eat → grow → collisions → refill food → counters → winner). |
+| `food.py` | `FoodCatalog` (loads `config/foods.json`), `FoodManager` (weighted spawn/expire/refill), `FoodStats`. |
+| `environment.py` | The RL bridge: `StateView` (AI's eye on the world), `get_observation()` (the 30 floats, documented index by index), `SnakeEnvironment` (the RL training loop). |
+
+**The agents (`src/snake_arena/agents/`)**
+
+| File | What you'll find inside |
+|---|---|
+| `base.py` | The contract every agent signs: `BaseAgent.decide()` → `AgentDecision`; `StrategyHints` (the LLM's strategy parcel). |
+| `rule_based.py` | The baseline: scores all 4 moves with a formula (food direction, danger, free space). No search. |
+| `bfs.py` | BFS pathfinding + the `BfsAgent` wrapper that turns a path into a move. |
+| `astar.py` | A\* (heap + Manhattan heuristic + turn penalty) + `AstarAgent` with value-aware food targeting. |
+| `rl_agent.py` | `RLAgent`: observation → network → best action. Only *acts*, never trains here. Lower half: `HybridAgent` (mixes Q-values + A\* + free space with config weights). |
+| `decision_manager.py` | **The brain-stem**: one pipeline for all modes — view → safety `evaluate_all()` → strategy (LLM worker / fallback) → policy → `select_safe_action()`. Produces the `DecisionLog` shown in the AI panel. |
+| `factory.py` | The only file that *creates* agents: `resolve_checkpoint_path`, `build_rl_agent`, `build_llm_client`, `build_strategy_worker`, `build_decision_manager(mode)`. |
+
+**Safety + LLM + RL layers**
+
+| File | What you'll find inside |
+|---|---|
+| `safety/validator.py` | The independent safety checker: given an action, returns a `SafetyReport` (safe / rejected + reason); includes the dead-end flood-fill check. |
+| `llm/ollama_client.py` | The HTTP client for Ollama: `is_available()`, `has_model()`, `chat_json()`, injectable "transport" for tests. |
+| `llm/strategist.py` | The prompt (`SYSTEM_PROMPT`), `fallback_strategy()`, and `StrategyWorker` — a background thread that asks the LLM every few seconds and caches the latest hints. |
+| `llm/schemas.py` | Strict validation of the LLM's JSON answer (names, weights in 0–1, legal values) — bad answers are thrown away. |
+| `llm/analysis.py` | Builds the compact JSON snapshot of the board the LLM "sees". |
+| `rl/` (5 files) | `network.py` (30→128→128→4 MLP), `replay_buffer.py` (NumPy ring memory), `rewards.py` (each reward part separate), `trainer.py` (the training loop), `checkpoints.py` (save/load + honest metadata). |
+
+**Evaluation + persistence + UI**
+
+| File | What you'll find inside |
+|---|---|
+| `evaluation/benchmark.py` | Shared-seed benchmark + tournament; `AGENT_LABELS` (pretty names); honest `llm_available` flag; artifact writing. |
+| `evaluation/metrics.py` | Score/survival/efficiency calculators. |
+| `evaluation/experiments.py` | JSON/CSV/PNG artifact writers + the training-curves chart. |
+| `persistence/storage.py` | Atomic save/load (`.tmp` then rename), `.corrupt` quarantine, clamps bad values instead of crashing. |
+| `persistence/history.py` | Appends each played game to `data/history/games.jsonl`; aggregates for Statistics. |
+| `ui/app.py` | `App` shell: window, screen stack, main loop, shared services (audio, LLM client/worker, cached RL agent). |
+| `ui/components.py` | The widget kit: `Button`, `Slider`, `Toggle`, `Dropdown`, `TextInput`, `Label` (has `.set(text, color)`), `ProgressBar`, `BarChart`, `DataTable`, plus `send_event()` / `draw_widgets()`. |
+| `ui/theme.py` | `COLORS` palette, `Fonts` (built in code), `text()`, `panel()`, `hline()`, `wrap_text()`. |
+| `ui/arena.py` | The game screen: keyboard handling (arrows/WASD/Space/R/1/2/+/−/Esc), `_tick()` (human input + AI decide + `engine.step`), overlays, HUD, game-over flow (`over_at`, `over_widgets_shown`). |
+| `ui/settings.py` | 5 sections of settings widgets bound to the live config; Save/Restore; the **LLM status line** (§5.22, story 5). |
+| `ui/menu.py`, `results.py`, `training_dashboard.py`, `benchmark_dashboard.py`, `statistics.py` | The other screens (one file each). |
+| `ui/audio.py` | Generates tones with pygame's mixer — no sound files. |
+| `config.py` | ~490 lines: every `*Config` dataclass, `load_app_config()` with env-var overrides (see `.env.example`: `SNAKE_ARENA_DISABLE_LLM` etc.). |
+| `utils/paths.py` | Where files live: `default_config_path()` → `config/default.json`, `data_dir()`, `models_dir()`, `logs_dir()`. |
 
 ---
 
@@ -840,9 +908,11 @@ and tiny helpers (`text()`, `panel()`, `hline()`, `wrap_text()`).
   AI), agent dropdowns, speed slider, seed, "Environment check" status.
 - **ArenaScreen** — the game. Grid, snakes (rounded segments), food shapes
   per type with expiry blink, HUD (scores, timer), overlays you can toggle:
-  A\* path, danger cells, target, rejected moves, Q-value bars; the
+  A\* path, danger cells, target, rejected moves, Q-value buttons; the
   diagnostics panel shows the latest `DecisionLog` (strategy source,
   interventions, notes). Human input: arrows/WASD, Space pause, R restart.
+  The game-over flow (delayed button reveal, why `draw()` must never rebuild
+  widgets) is told line by line in §5.22 story 1.
 - **ResultsScreen** — end-of-game table (scores, lengths, foods by type,
   deaths), safety/LLM summary, Rematch / Menu.
 - **TrainingDashboard** — start/pause/stop training in a background thread;
@@ -853,6 +923,9 @@ and tiny helpers (`text()`, `panel()`, `hline()`, `wrap_text()`).
   tournament mode; a gold banner when LLM results are fallback-only.
 - **SettingsScreen** — every config section as widgets, bound live to
   `app.config`; Save (validate + atomic save) / Restore Saved / Back.
+  The LLM Planner section ends with a **live status line** that probes
+  Ollama in a background thread (§5.22, story 5) — green "connected",
+  red "not reachable" + the exact commands to fix it.
 - **StatisticsScreen** — history aggregates + the last 30 games table,
   Clear History.
 
@@ -882,7 +955,342 @@ when audio is unavailable.
 It also inserts `src/` into `sys.path` so a plain
 `python main.py` works without installing the package.
 
----
+## 5.22 The bug-fix diary — true stories, line by line
+
+These four bugs + one feature were all found by **real play-testing** after
+the project was "finished". Each story follows the same shape: **what you
+saw → the concept you need → the code, line by line, in the order it runs →
+the proof**. Read them in order — story 3 and 4 connect to each other.
+
+### Story 1 — "The game is stuck when it ends" (the frozen game-over screen)
+
+**What you (the player) saw:** the game finishes, the "Game over" banner
+appears… and nothing responds. Clicks do nothing. The only way out was
+closing the window.
+
+**Concept first — how a click actually works.** A mouse click is really
+**two events**: `MOUSEBUTTONDOWN` (you press) and `MOUSEBUTTONUP` (you
+release). A `Button` widget becomes "pressed" on DOWN and fires its action
+on UP *only if the press and release both happened on it*. Between the two
+events, frames pass — the game keeps drawing.
+
+**The flow that broke.** Every frame the game does: `update(dt)` →
+`draw(surface)` → next frame. The old code had, inside `draw()`:
+
+```python
+def draw(self, surface):
+    ...
+    self.layout()   # ← the bug: rebuild the widget list EVERY frame
+```
+
+`layout()` starts with `self.widgets = []` and rebuilds every button/slider
+as **brand-new objects**. So:
+
+1. You press the mouse on a button → `handle_event` marks **that object's**
+   `pressed = True`. At this moment the object under the mouse is the OLD
+   button object.
+2. Next frames call `draw()` → `layout()` throws away the old objects and
+   makes new ones.
+3. You release → `MOUSEBUTTONUP` arrives, is given to the NEW object —
+   which was never pressed, so it ignores it. The click is lost.
+
+The fix has three parts, in `ui/arena.py`:
+
+```python
+def on_enter(self) -> None:
+    self.layout()               # lay out once, when the screen opens
+```
+
+```python
+# in _build_game(): the reset block
+self.over_at = None
+self.over_widgets_shown = False
+```
+
+```python
+def update(self, dt: float) -> None:
+    if self.state_name == "over":
+        # Reveal the end-of-game buttons once, shortly after the banner.
+        if (not self.over_widgets_shown and self.over_at is not None
+                and time.time() - self.over_at > 0.9):
+            self.over_widgets_shown = True
+            self.layout()
+        return
+    ...
+```
+
+Line by line:
+- `over_at` — the exact time the game ended (a timestamp, set when the
+  engine reports `done`). We store it so we can wait a moment.
+- `over_widgets_shown` — a flag ("bool"), starts `False`. "Have we already
+  built the end-of-game buttons?"
+- In `update()`: when the state is `"over"`, if the flag is still `False`
+  AND more than 0.9 s passed since the banner, set the flag `True` and call
+  `layout()` **once**. From then on, the same button objects stay in
+  `self.widgets`, so a click's DOWN→UP pair lands on the *same* object —
+  a click can never be lost again.
+- `draw()` no longer calls `layout()` — it only *draws* whatever exists.
+
+**The proof (regression test).** `tests/test_ui_headless.py::test_arena_game_over_buttons_survive_clicks`
+forces the over-state, lets the 0.9 s pass, then sends a real
+DOWN → frames → UP click pair and asserts the click works even though
+frames passed in between. When re-applied to the old code, this test
+**fails**; with the fix it passes. That is how you know the fix is real.
+
+### Story 2 — "UP arrow doesn't work" (the invisible zero)
+
+**What you saw:** DOWN, LEFT, RIGHT all worked; UP did nothing.
+
+**Concept first — "truthy" and "falsy".** In Python, `if x or default`
+means "x if x is truthy, else default". Most values are truthy — but the
+number **0 is falsy** (counts as "nothing"). Our actions are an `IntEnum`:
+
+```python
+class Action(IntEnum):
+    UP = 0      # ← zero!
+    DOWN = 1
+    LEFT = 2
+    RIGHT = 3
+```
+
+The old `_tick()` had:
+
+```python
+action = self.pending_human_action or human.direction   # ← the bug
+```
+
+The OLD line (kept for honesty — this was the bug) uses `or`: when you
+press UP, `pending_human_action` is `Action.UP`, which **equals 0**, and
+0 is "falsy" — Python treats it like "nothing", so Python picks the second
+choice: `human.direction` (keep going straight). UP presses were silently
+discarded. DOWN=1, LEFT=2, RIGHT=3 are all truthy, so those worked —
+that's why *only UP was dead*.
+
+The fix, in `_tick()`:
+
+```python
+# NB: `Action.UP == 0` is falsy -- must compare with None explicitly.
+action = self.pending_human_action if self.pending_human_action is not None else human.direction
+```
+
+Line by line: "if `pending_human_action` **is not None** → use it; else
+use the current direction." `None` is Python's real "nothing". `Action.UP`
+is 0, and 0 **is not None** — True → your UP press is used. One line, bug
+dead.
+
+**The proof.** New regression test `test_human_up_arrow_turns_the_snake`:
+press UP→LEFT→DOWN→RIGHT in sequence (each turn is a 90° turn, so no press
+is a "reversal" — the engine ignores reversals on purpose: a snake can't
+fold into its own neck). All four turns must change the snake's heading;
+the test passes with the fix and fails on the old `or` code.
+
+### Story 3 — "The LLM kept turning itself off" (tests overwriting your config)
+
+**What you saw:** "errors in settings", and the LLM planner was mysteriously
+off; you couldn't figure out how to use the LLM.
+
+**Concept first — tests share your computer with you.** Tests are code too.
+If a test presses the Settings screen's **Save** button, the game writes
+`config/default.json` — *your real settings file* — with whatever the test
+had set. Our test fixture (a fixture is code that prepares a shared test
+environment) sets `cfg.llm.enabled = False` so tests never touch the
+network. Now connect the dots:
+
+- test presses Save → writes `llm.enabled: false` into **your** real
+  config file.
+- You launch the game → reads the file → LLM off. Every test run re-broke
+  it. That was the "errors in settings".
+
+The fix, in `tests/test_ui_headless.py`:
+
+```python
+def test_settings_roundtrip_through_widgets(app, monkeypatch, tmp_path):
+```
+
+Two pytest freebies:
+- `tmp_path` — a pytest-built **empty temp folder** for this one test.
+- `monkeypatch` — a pytest tool to temporarily replace something in code,
+  auto-restored after the test.
+
+```python
+monkeypatch.setattr(paths, "default_config_path", lambda: tmp_path / "default.json")
+```
+
+Line by line: "inside `snake_arena.utils.paths`, temporarily replace the
+function `default_config_path` with a lambda that returns a file inside the
+temp folder." `AppConfig.save()` calls `paths.default_config_path()` when
+no path is given — so the test's Save now writes **there**, not to your
+real config. Auto-restored afterwards.
+
+**The proof.** The test now asserts `(tmp_path / "default.json").exists()`
+— the file landed in the temp folder, not in `config/`. Your real config
+stays yours. (And we restored `llm.enabled: true` in the real config.)
+
+### Story 4 — the health-check crash bug (wrong argument)
+
+**What you saw:** nothing — it was a **hidden bug**, found by reading, not
+by crash. `scripts/check_environment.py` had:
+
+```python
+client = OllamaClient(config.llm)          # ← the bug
+```
+
+But look at the constructor:
+
+```python
+class OllamaClient:
+    def __init__(self, host: str = "http://127.0.0.1:11434", model: str = "qwen3:4b", ...):
+        self.host = host.rstrip("/")
+```
+
+The first parameter is `host: str` — a **string**. We passed a whole
+`LLMConfig` *object*. Result: later `host.rstrip("/")` → **AttributeError
+crash**. It never crashed in practice only because the config file had
+(accidentally, via story 3) LLM disabled — the buggy line never ran! One
+silent bug was hiding another. Fix — pass the fields properly:
+
+```python
+client = OllamaClient(
+    host=config.llm.host,
+    model=config.llm.model,
+    timeout=config.llm.timeout_seconds,
+    connect_timeout=config.llm.connection_timeout_seconds,
+    max_retries=config.llm.max_retries,
+)
+```
+
+**The proof.** With LLM enabled, `--check` now prints
+`[OK] Ollama - not reachable (...) - expected if not installed` and exits
+**ALL CHECKS PASSED** — no crash.
+
+### Story 5 (a feature, not a bug) — the LLM status line in Settings
+
+**Why:** before, if Ollama wasn't running, you only learned about it from
+fallback messages *inside a game*. Now the Settings screen tells the truth
+right where you configure it. File: `ui/settings.py`. Four pieces, in the
+order they run.
+
+**(a) The import (top of file):**
+
+```python
+import threading
+```
+
+*Meaning:* `threading` lets us run a small job "in the background" so the
+window never freezes while we wait for Ollama to answer.
+
+**(b) Remembering state — added to `__init__`:**
+
+```python
+self._llm_status_label: Label | None = None   # the widget showing the verdict
+self._llm_probe_key: tuple | None = None      # which settings we already probed
+self._llm_status: tuple[str, str] | None = None  # (text, color) of last result
+```
+
+Line by line:
+- `_llm_status_label` — the on-screen `Label` widget. `None` until the LLM
+  Planner section is built.
+- `_llm_probe_key` — a memory of *which* (enabled, host, model) we already
+  checked, so we don't re-check the same thing again and again.
+- `_llm_status` — the last verdict, saved so a screen redraw can show it
+  without checking again.
+
+**(c) The prober — `_probe_llm()`, called whenever the LLM Planner section
+is built, and after Save:**
+
+```python
+def _probe_llm(self) -> None:
+    label = self._llm_status_label
+    if label is None:
+        return
+```
+
+Line by line: grab the label; if we're not on the LLM section (label never
+built), do nothing.
+
+```python
+    cfg = self.app.config.llm
+    key = (cfg.enabled, cfg.host, cfg.model)
+    if key == self._llm_probe_key:
+        if self._llm_status:
+            label.set(*self._llm_status)
+        return
+    self._llm_probe_key = key
+    self._llm_status = None
+```
+
+Line by line:
+- Build a `key` — a tuple of the three settings that matter. Same key =
+  same question, no need to ask again.
+- If we already asked this exact question: show the stored verdict
+  (`label.set(*self._llm_status)` — the `*` unpacks the tuple into
+  `set(text, color)`) and stop.
+- Otherwise remember the key and clear the old verdict.
+
+```python
+    if not cfg.enabled:
+        status = ("LLM planner is off -- the game plays fine without it.", COLORS.text_dim)
+        self._llm_status = status
+        label.set(*status)
+        return
+```
+
+If LLM is switched off: show a calm grey message and stop. No network call
+at all.
+
+```python
+    label.set("checking Ollama ...", COLORS.text_dim)
+```
+
+Show "checking…" immediately, so the user sees something *before* the
+answer arrives.
+
+```python
+    def work():
+        from ..agents.factory import build_llm_client
+
+        client = build_llm_client(self.app.config)
+        if client is None:
+            status = ("LLM planner is off -- the game plays fine without it.", COLORS.text_dim)
+        else:
+            ok, detail = client.is_available()
+            if not ok:
+                status = (
+                    f"Ollama not reachable at {cfg.host} -- install ollama, run 'ollama serve'"
+                    f" and 'ollama pull {cfg.model}'  ({detail[:44]})",
+                    COLORS.danger)
+            elif (has_model := client.has_model())[0]:
+                status = (f"Ollama connected -- model {has_model[1]} ready.", COLORS.success)
+            else:
+                status = (f"Ollama reachable, but {detail}", COLORS.gold)
+        self._llm_status = status
+        label.set(*status)
+
+    threading.Thread(target=work, daemon=True).start()
+```
+
+Line by line:
+- `work` is a small inner function holding the actual checks. It runs on a
+  **separate thread**, so the window keeps responding while it waits up to
+  ~2.5 s for Ollama.
+- `build_llm_client(...)` returns `None` when LLM is disabled (safety net).
+- `client.is_available()` → `(ok, detail)`. Not ok → red message that
+  includes **the exact commands to fix it**.
+- `(has_model := client.has_model())[0]` — the `:=` "walrus" operator:
+  call, save the result into `has_model`, and test its first item in one
+  move. Model present → green "connected". Server up but model missing →
+  gold "reachable, but …".
+- Finally store the verdict in `_llm_status` and put it on the label.
+  Writing a Python string from a background thread is safe here; the main
+  thread draws it on the next frame.
+- `daemon=True` — if the game closes, this background thread dies quietly
+  instead of keeping the process alive.
+
+**The proof.** New test
+`test_settings_llm_status_label_reports_ollama`: it *fakes* a dead Ollama
+(`monkeypatch.setattr(OllamaClient, "_transport", ...)`), opens the LLM
+section, waits, and asserts the label says "not reachable" and shows the
+fix commands. Fast, offline, deterministic.
 
 # 6. Every command, explained
 
@@ -971,8 +1379,8 @@ tournament file with wins/win-rates/draws, printed as a table.
 ```bash
 .venv/bin/python -m pytest tests/ -q
 ```
-*Meaning:* run all 101 automated tests quietly (`-q` = compact output).
-Expected last line: **`101 passed`** (~5 s). No internet, no window, no
+*Meaning:* run all 104 automated tests quietly (`-q` = compact output).
+Expected last line: **`104 passed`** (~6 s). No internet, no window, no
 Ollama needed. Useful variants:
 
 ```bash
@@ -991,6 +1399,48 @@ qwen3:4b`), then turn it on in **Settings → LLM Planner → enabled → Save**
 (or set `"enabled": true` in `config/default.json`). If the server is down,
 agents just use the fallback strategy — nothing breaks.
 
+### Using the LLM planner for real (full setup)
+
+The LLM runs **locally** through [Ollama](https://ollama.com) — nothing is
+sent to the internet at play time. On Arch Linux:
+
+```bash
+sudo pacman -S ollama            # 1. install Ollama
+systemctl enable --now ollama    # 2. start it as a service (runs at boot)
+ollama pull qwen3:4b             # 3. download the model (~2.6 GB, once)
+ollama list                      # 4. confirm qwen3:4b is there
+```
+
+No systemd preference? Step 2 can just be `ollama serve` in any terminal
+(keep it open while playing). To use a different model, pull it and put its
+tag in **Settings → LLM Planner → model**. Any instruct model that Ollama
+serves works; smaller ones answer faster.
+
+Then check everything is wired up:
+
+```bash
+.venv/bin/python scripts/check_environment.py
+# LLM planner (optional)
+#   [OK  ] Ollama - qwen3:4b (0.1s)
+```
+
+Or just open the game: **Settings → LLM Planner** now shows a live status
+line at the bottom of the section — *green "Ollama connected -- model
+qwen3:4b ready"*, or a red line telling you exactly what to run.
+
+To actually see the LLM play, pick an LLM-using agent:
+
+| Agent | What the LLM does |
+|---|---|
+| `llm_astar` | LLM suggests the *strategy* (which food, how aggressive); A* computes the path |
+| `llm_rl` | LLM strategy hints steer the trained DQN |
+| `hybrid` | Weighted blend of RL, A* and free-space scores, LLM hints on top |
+
+Choose it in **Play → mode select** or as the default in **Settings →
+Agents**. During a game, press `1` / `2` to open an AI panel: when the LLM
+answers you'll see `llm: ok 350 ms`; if it can't, you'll see the fallback
+reason instead — the game itself never waits or freezes on the LLM.
+
 ### Where everything lands
 
 | You ran | You get |
@@ -1005,10 +1455,11 @@ agents just use the fallback strategy — nothing breaks.
 
 # 7. The tests
 
-`tests/` — 101 tests, all offline. Why they matter for your defence: they
+`tests/` — 104 tests, all offline. Why they matter for your defence: they
 prove the claims, and during development they caught **real bugs** (the
 food-stacking bug, a wrong pygame API, path-resolution, three UI import
-errors caught by the headless screen test).
+errors, the config-overwriting test of §5.22 story 3, and the four
+play-testing bugs of §5.22).
 
 | File | Covers |
 |---|---|
@@ -1018,12 +1469,12 @@ errors caught by the headless screen test).
 | `test_pathfinding.py` | A\* optimal + detour + unreachable, BFS parity, flood-fill survivability |
 | `test_safety.py` | each rejection reason, dead-end geometry, `select_safe_action` override, honest `no_safe_action` |
 | `test_rl.py` | network shapes, replay ring behaviour, each reward component, training runs, **deterministic greedy eval**, checkpoint round-trip, CheckpointError |
-| `test_llm.py` | a **FakeTransport** (programmer-programmable fake HTTP): availability, JSON mode, `<think>` stripping, retries, strict validation rejections, fallback determinism, snapshot hash |
+| `test_llm.py` | a **FakeTransport** (programmable fake HTTP): availability, JSON mode, `<think>` stripping, retries, strict validation rejections, fallback determinism, snapshot hash |
 | `test_decision_manager.py` | all 7 modes decide + log; LLM modes use fallback with `llm_calls == 0`; safety overrides a stubborn policy; the exact risk-gate formula |
 | `test_benchmark.py` | structure, **identical seeds across agents**, honest `llm_available: false`, match fields, tick cap, cancellation |
 | `test_persistence.py` | atomic round-trip, corrupt quarantine, damaged-JSONL skip, config clamping/recovery |
 | `test_integration.py` | full episodes through every mode; observation shape; benchmark → saved artifacts → reload identical; history receives played games |
-| `test_ui_headless.py` | every screen constructs, updates, draws, and takes an event — with SDL's **dummy** video driver (`SDL_VIDEODRIVER=dummy`), i.e. no monitor needed |
+| `test_ui_headless.py` | every screen constructs, updates, draws, and takes an event — with SDL's **dummy** video driver (`SDL_VIDEODRIVER=dummy`), i.e. no monitor needed. Also the **regression tests** from §5.22: game-over buttons survive clicks across frames, all four arrows turn the snake, Settings saves go to a temp file (not your real config), and the LLM status label reports a dead Ollama honestly. |
 
 **How to add a test:** create `tests/test_whatever.py`, import from
 `.conftest` (`from .conftest import make_engine`), write functions named
@@ -1112,6 +1563,17 @@ trap probability in `config/foods.json`.
 - **Posture/hints** — the LLM's output: strategy parameters, never moves.
 - **Fallback strategy** — the deterministic stand-in when the LLM is
   missing/slow/wrong.
+- **Truthy / falsy** — whether Python treats a value as "something" or
+  "nothing" in an `if`/`or`. `0`, `""`, `None` are falsy; almost everything
+  else is truthy. The UP-arrow bug (§5.22 story 2) came from `0` being falsy.
+- **Regression test** — a test written *after* fixing a bug, that fails on
+  the old broken code and passes on the fixed code — so the bug can never
+  sneak back in silently.
+- **Thread** — a second line of execution inside one program. Used so the
+  LLM call and training never freeze the game window.
+- **monkeypatch / tmp_path** — pytest tools: temporarily replace a function
+  during a test (auto-restored), and a private temp folder per test. Used in
+  §5.22 story 3 to stop tests touching your real config.
 
 **Questions you may be asked, with short true answers**
 
@@ -1138,9 +1600,22 @@ trap probability in `config/foods.json`.
 - *"Why pygame-ce?"* — Classic pygame has no package for Python 3.14 and its
   source build here had a broken font module; pygame-ce is the maintained
   drop-in replacement with official wheels.
-- *"What was the hardest bug?"* — Food could spawn on top of existing food
-  because the spawn check ignored occupied food cells; a test caught it and
-  the fix was one parameter: `occupied_cells(include_food=True)`.
+- *"What was the hardest bug?"* — Two candidates, both good stories. (1)
+  Food could spawn on top of existing food because the spawn check ignored
+  occupied food cells; a test caught it and the fix was one parameter:
+  `occupied_cells(include_food=True)`. (2) The UP arrow: `Action.UP == 0`
+  and `0` is falsy in Python, so `x or default` silently discarded UP
+  presses — the fix was comparing with `None` explicitly (§5.22 story 2).
+- *"Did anything break after you finished?"* — Yes, four things, and each is
+  documented with its line-by-line fix and a regression test (§5.22). The
+  most interesting: the test suite itself was silently overwriting the
+  user's config file — a lesson that tests must never write to real user
+  data (redirect persistence into `tmp_path`).
+- *"Why does the game never freeze waiting for the LLM?"* — Three layers:
+  the strategy worker runs on a background thread and the game reads only
+  the latest cached hints; calls have hard timeouts with limited retries;
+  and the safety validator + fallback strategy guarantee a decision every
+  tick even if the LLM never answers.
 
 ---
 

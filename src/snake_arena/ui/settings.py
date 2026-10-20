@@ -7,6 +7,8 @@ LLM-dependent cached services are invalidated when LLM settings change.
 
 from __future__ import annotations
 
+import threading
+
 import pygame
 
 from ..config import AppConfig, load_app_config
@@ -39,6 +41,9 @@ class SettingsScreen(Screen):
         self.section = "Game"
         self.note = ""
         self.note_color = COLORS.text_dim
+        self._llm_status_label: Label | None = None
+        self._llm_probe_key: tuple | None = None
+        self._llm_status: tuple[str, str] | None = None  # (text, color) from last probe
 
     def on_enter(self) -> None:
         self.layout()
@@ -63,6 +68,55 @@ class SettingsScreen(Screen):
         except Exception:  # noqa: BLE001 - audio is optional
             pass
 
+    def _probe_llm(self) -> None:
+        """Check Ollama reachability off the UI thread; label updates when done.
+
+        Probing is keyed on (enabled, host, model), so re-layouts with the same
+        values don't re-probe, and editing host/model then saving re-probes.
+        """
+        label = self._llm_status_label
+        if label is None:
+            return
+        cfg = self.app.config.llm
+        key = (cfg.enabled, cfg.host, cfg.model)
+        if key == self._llm_probe_key:
+            # Already probed this configuration; show the stored result.
+            if self._llm_status:
+                label.set(*self._llm_status)
+            return
+        self._llm_probe_key = key
+        self._llm_status = None
+
+        if not cfg.enabled:
+            status = ("LLM planner is off -- the game plays fine without it.", COLORS.text_dim)
+            self._llm_status = status
+            label.set(*status)
+            return
+
+        label.set("checking Ollama ...", COLORS.text_dim)
+
+        def work() -> None:
+            from ..agents.factory import build_llm_client
+
+            client = build_llm_client(self.app.config)
+            if client is None:
+                status = ("LLM planner is off -- the game plays fine without it.", COLORS.text_dim)
+            else:
+                ok, detail = client.is_available()
+                if not ok:
+                    status = (
+                        f"Ollama not reachable at {cfg.host} -- install ollama, run 'ollama serve'"
+                        f" and 'ollama pull {cfg.model}'  ({detail[:44]})",
+                        COLORS.danger)
+                elif (has_model := client.has_model())[0]:
+                    status = (f"Ollama connected -- model {has_model[1]} ready.", COLORS.success)
+                else:
+                    status = (f"Ollama reachable, but {detail}", COLORS.gold)
+            self._llm_status = status
+            label.set(*status)
+
+        threading.Thread(target=work, daemon=True).start()
+
     # -- save / restore ----------------------------------------------------------
 
     def _save(self) -> None:
@@ -70,6 +124,7 @@ class SettingsScreen(Screen):
         cfg.validate()
         path = cfg.save()
         self._flash(f"saved: {path}", COLORS.success)
+        self._probe_llm()  # settings may have changed host/model -> refresh status
 
     def _restore(self) -> None:
         self.app.config = load_app_config()
@@ -226,6 +281,10 @@ class SettingsScreen(Screen):
                 "Max response tokens", float(cfg.llm.max_tokens), 40, 1024,
                 lambda v: setattr(cfg.llm, "max_tokens", int(v)),
                 (x0, y), width=320, fmt=lambda v: f"{int(v)}"))
+            y += 56
+            self._llm_status_label = Label("", (x0, y), font=None, color=COLORS.text_dim)
+            self.widgets.append(self._llm_status_label)
+            self._probe_llm()
 
         elif section == "RL & Safety":
             self.widgets.append(Slider(

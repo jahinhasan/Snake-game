@@ -88,15 +88,23 @@ def test_arena_and_results_render(app):
     _exercise(ResultsScreen(app, record, rematch=lambda: None), app)
 
 
-def test_settings_roundtrip_through_widgets(app):
-    """Moving a slider and saving writes a valid config file."""
-    from snake_arena.ui.settings import SettingsScreen
+def test_settings_roundtrip_through_widgets(app, monkeypatch, tmp_path):
+    """Moving a slider and saving writes a valid config file.
 
+    The save target is redirected into tmp_path: this test used to write the
+    app fixture's settings (LLM disabled) over the user's real
+    config/default.json, silently turning the LLM planner off for them.
+    """
+    from snake_arena.ui.settings import SettingsScreen
+    from snake_arena.utils import paths
+
+    monkeypatch.setattr(paths, "default_config_path", lambda: tmp_path / "default.json")
     screen = SettingsScreen(app)
     app.push_screen(screen)
     screen._volume_changed(0.75)
     assert app.config.audio.volume == pytest.approx(0.75)
     screen._save()
+    assert (tmp_path / "default.json").exists(), "save must write the redirected config path"
     app.pop_screen()
 
 
@@ -177,3 +185,42 @@ def test_human_up_arrow_turns_the_snake(app):
             assert arena.engine.state.snakes["human"].direction == expected
     finally:
         app.pop_screen()
+
+
+def test_settings_llm_status_label_reports_ollama(app, monkeypatch):
+    """The LLM Planner section shows a real reachability status, probed in the
+    background so the UI never freezes, with honest text when Ollama is absent.
+    """
+    import time as time_mod
+
+    from snake_arena.config import LLMConfig
+    from snake_arena.llm.ollama_client import OllamaClient, OllamaUnavailable
+    from snake_arena.ui.settings import SettingsScreen
+
+    # Deterministic probe result: pretend Ollama is unreachable.
+    def unavailable(self, path, payload, timeout):
+        raise OllamaUnavailable("cannot reach Ollama (test)")
+
+    monkeypatch.setattr(OllamaClient, "_transport", unavailable, raising=False)
+
+    cfg: AppConfig = app.config
+    original = cfg.llm
+    cfg.llm = LLMConfig()  # enabled, pointing at the default host
+    try:
+        screen = SettingsScreen(app)
+        screen.section = "LLM Planner"
+        app.push_screen(screen)
+        label = screen._llm_status_label
+        assert label is not None, "LLM status label must exist"
+        deadline = time_mod.time() + 5.0
+        while "checking" in label.content and time_mod.time() < deadline:
+            time_mod.sleep(0.05)
+        assert "not reachable" in label.content, label.content
+        assert "ollama serve" in label.content, "status must say how to fix it"
+        # Re-layout with unchanged settings shows the stored verdict, no re-probe.
+        screen.layout()
+        assert "not reachable" in screen._llm_status_label.content
+    finally:
+        cfg.llm = original
+        if app.screens and app.screens[-1] is screen:
+            app.pop_screen()

@@ -113,7 +113,13 @@ def run_checks(config) -> int:
     else:
         from snake_arena.llm.ollama_client import OllamaClient
 
-        client = OllamaClient(config.llm)
+        client = OllamaClient(
+            host=config.llm.host,
+            model=config.llm.model,
+            timeout=config.llm.timeout_seconds,
+            connect_timeout=config.llm.connection_timeout_seconds,
+            max_retries=config.llm.max_retries,
+        )
         started = time.time()
         ok, detail = client.is_available()
         if ok:
