@@ -35,6 +35,7 @@ defending, or modifying the project. Everything here matches the real code in
    - 5.20 [The UI](#520-the-ui--pygame-screens)
    - 5.21 [Entry points](#521-entry-points--mainpy--scripts)
    - 5.22 [The bug-fix diary](#522-the-bug-fix-diary--true-stories-line-by-line) — real bugs fixed after launch, line by line
+   - 5.23 [The agents' algorithms, line by line](#523-the-agents-algorithms-line-by-line--your-viva-crib-sheet) — for your viva: what each agent's code does
 6. **Every command, explained** ([section 6](#6-every-command-explained))
 7. [The tests](#7-the-tests)
 8. [How to change things (recipes)](#8-how-to-change-things-recipes)
@@ -152,8 +153,9 @@ snake-game/
 ├── requirements.txt         ← dependency list
 ├── setup_linux.sh           ← one-time installer (Linux/macOS)
 ├── run_linux.sh             ← launcher (Linux/macOS)
-├── setup_windows.ps1        ← installer (Windows — written, not yet tested)
-├── run_windows.bat          ← launcher (Windows)
+├── setup_windows.ps1        ← PowerShell installer (Windows — written, not yet tested)
+├── run_windows.bat          ← ONE command for Windows: installs everything on
+│                               first run, then launches the game (see §6)
 ├── config/
 │   ├── default.json         ← ALL settings (board, game, LLM, RL, benchmark…)
 │   └── foods.json           ← the 5 food types (value, %, lifetime, colour…)
@@ -1292,6 +1294,329 @@ Line by line:
 section, waits, and asserts the label says "not reachable" and shows the
 fix commands. Fast, offline, deterministic.
 
+## 5.23 The agents' algorithms, line by line — your viva crib sheet
+
+This section answers the viva question *"what does each agent's algorithm
+actually do — show me the line"*. Every snippet below is the real code.
+Each agent gets: **its role** (why it exists in the project), the
+**algorithm in plain words**, then the **code, line by line**, and a
+one-sentence *"tell sir"* summary.
+
+A fact that frames everything: **no agent moves the snake directly.** Every
+agent only *proposes* an action; the Decision Manager pipeline
+(§5.15) runs the safety validator (§5.13) on it, and replaces it with a
+safe move if it would kill the snake. The agents below differ only in *how
+they choose what to propose*.
+
+### 5.23.1 Rule-Based — the formula agent (`agents/rule_based.py`)
+
+**Role:** the baseline "common sense" player. No search, no learning — it
+scores all 4 moves with a fixed formula and picks the best. Every other
+agent is measured against it (it actually scored highest in our benchmark,
+which is an honest finding for a 4-segment snake on a small board).
+
+**Plain words:** for each of the 4 possible moves compute a *utility
+score*; skip any move that is instantly fatal; pick the highest scorer.
+
+```python
+positives = [f for f in state.foods if f.value > 0]        # ignore trap food
+target = max(positives, key=lambda f: f.value / (1 + abs(f.pos[0] - head[0]) + abs(f.pos[1] - head[1])))
+```
+
+Line by line:
+- keep only foods worth eating (value > 0 — traps have negative value);
+- pick the food with the best **value ÷ (1 + distance)** — close foods beat
+  far foods even if they're small. `abs(...) + abs(...)` is the Manhattan
+  distance. (If the LLM strategy says "aggressive", line 56 instead picks
+  the highest-*value* food regardless of distance.)
+
+```python
+for action in ALL_ACTIONS:                        # UP, DOWN, LEFT, RIGHT
+    cell = (head[0] + ddx, head[1] + ddy)         # where would this move put my head?
+    if not state.is_inside(cell): scores[action] = -1e9   # wall → hopeless
+    if is_deadly_for(state, me, cell): scores[action] = -1e9   # body/opponent → hopeless
+```
+
+Line by line: compute the destination cell of each move; any move that hits
+a wall or a body gets −1 000 000 000 ("never unless everything else is
+worse").
+
+```python
+area = flood_fill_count(cell, view.blocked, ...)  # free cells reachable from there
+if area < me.length: scores[action] = -1e6 + area # pocket smaller than me = trap
+```
+
+Line by line: flood fill (§5.3) counts how many free cells I could still
+reach *after* this move. If that pocket is smaller than my body, the move
+leads into a dead end — score it almost as bad as death (the `+ area`
+tie-breaks toward bigger pockets when every move is tight).
+
+```python
+utility += 2.0 * (before - after)      # getting closer to target = good
+utility += 0.5 * min(1.0, area / 8.0)  # having space after = good (capped)
+if cell in trap_cells and positives: utility -= 3.0   # stepping on trap = bad
+if cell in opponent_cells: utility -= 1.5             # head-butting risk = bad
+```
+
+These four lines are the formula from the docstring: +2.0 × progress,
++0.5 × free space, −3.0 × trap, −1.5 × contested cell.
+
+```python
+best = max(scores, key=lambda a: scores[a])   # the winner
+```
+
+Pick the action with the highest score and return it as an `AgentDecision`
+(with per-move scores in `diagnostics` — that's what the UI shows).
+
+**Tell sir:** *"Rule-based scores each of the four moves with a utility
+formula — progress toward the best value-per-distance food, plus free
+space, minus trap and head-on risks — excludes fatal moves by flood-fill,
+and plays the argmax. It's the deterministic baseline the smarter agents
+must beat."*
+
+### 5.23.2 BFS — the shortest-path agent (`agents/bfs.py`)
+
+**Role:** the "pure distance" searcher. It always goes to the **nearest**
+food by step count, ignoring food values — deliberately, so the benchmark
+can show what value-aware targeting (A\*) buys over plain shortest path.
+
+**Plain words:** explore the grid in **waves** from the head until the food
+is reached; the first wave to arrive is the shortest path.
+
+```python
+queue: deque[Cell] = deque([start])     # FIFO = "first in, first out"
+parent: dict[Cell, Cell] = {start: start}
+visited: set[Cell] = {start}
+```
+
+Line by line: the wave lives in a **FIFO queue** (a list where you add at
+the back, remove from the front). `parent` remembers "which cell did I
+come from when I first reached this cell" — needed later to rebuild the
+path. `visited` stops us checking the same cell twice.
+
+```python
+while queue and nodes < max_nodes:
+    current = queue.popleft()           # take the OLDEST cell found
+    for dx, dy in DIR_VECTORS.values(): # try its 4 neighbours
+        nxt = (current[0] + dx, current[1] + dy)
+        if nxt in visited or nxt in blocked: continue   # wall/body → skip
+        visited.add(nxt); parent[nxt] = current
+        if nxt == goal:                 # reached the food!
+            path = [nxt]
+            while path[-1] != start: path.append(parent[path[-1]])
+            path.reverse()              # goal → start  becomes  start → goal
+            return path
+        queue.append(nxt)               # this neighbour joins the wave
+```
+
+Line by line: pop the oldest cell (wave order! that's what makes BFS
+find *shortest* paths first), look at its 4 neighbours, skip walls/bodies
+and seen cells, record each new cell's parent, and the moment any cell
+**is** the food, walk the `parent` chain backwards to rebuild the path and
+reverse it.
+
+The agent wrapper then adds safety on top:
+
+```python
+for food in ranked:                                  # foods sorted by distance
+    path = bfs_search(me.head, food.pos, ...)
+    area = flood_fill_count(path[-1], blocked | interior, ...)
+    if area < me.length: continue                    # bait pocket → try next food
+    chosen_path, chosen_food = path, food; break
+```
+
+Try foods nearest-first; accept a food only if the pocket at its end is
+big enough to survive in. If **no** food is safely reachable:
+
+```python
+path = bfs_search(me.head, me.tail, ..., blocked - {me.tail})
+```
+
+Classic **tail-chase survival**: path to our own tail (which is safe
+because the tail vacates each tick) and circle until the board changes.
+
+**Tell sir:** *"BFS explores in waves with a FIFO queue, guaranteeing the
+shortest path in steps to the nearest non-trap food, with a flood-fill
+pocket check against bait corridors and tail-chasing as the survival
+fallback."*
+
+### 5.23.3 A\* — the smart searcher (`agents/astar.py`)
+
+**Role:** the strongest classical agent. Like BFS it finds a path, but it
+**aims its search toward the goal** using a distance estimate, and it
+targets food by **value**, not just distance. It also re-plans **every
+tick** so it never acts on an outdated path.
+
+**Plain words:** explore cells in order of
+`f(n) = g(n) + h(n)` — *cost already walked* + *Manhattan estimate of what
+is left*. Because the estimate never overestimates on a grid, the first
+path found is optimal.
+
+```python
+open_heap: list[tuple[float, int, Cell]] = []      # the priority queue
+g_score: dict[Cell, float] = {start: 0.0}          # cheapest known cost to each cell
+came_from: dict[Cell, tuple[Cell, Action]] = {}    # how we got here (for the path)
+heapq.heappush(open_heap, (float(h0), counter, start))   # start with f = h(start)
+```
+
+Line by line: the **heap** always pops the cell with the smallest f-score
+— that's the whole trick of A\*. `g_score` remembers the best cost found
+so far to reach each cell; `came_from` remembers the move that got us
+there.
+
+```python
+while open_heap and expansions < max_expansions:
+    _, _, current = heapq.heappop(open_heap)   # most promising cell
+    if current in closed: continue             # already finished → skip
+    closed.add(current); expansions += 1
+    if current == goal: return _reconstruct(came_from, current)
+```
+
+Pop the most promising cell; if it *is* the food, rebuild the path by
+walking `came_from` backwards (`_reconstruct`, line 91).
+
+```python
+    step_cost = 1.0 + (turn_penalty if prev_dir is not None and action != prev_dir else 0.0)
+    tentative = cur_g + step_cost
+    if tentative < g_score.get(nxt, math.inf):
+        g_score[nxt] = tentative
+        came_from[nxt] = (current, action)
+        heapq.heappush(open_heap, (tentative + manhattan(nxt, goal), counter, nxt))
+```
+
+Line by line: a step costs 1, **plus a small turn penalty (0.02)** if this
+move would turn — that's why A\* paths look smooth on screen. If going to
+`nxt` this way is cheaper than any earlier way, record the new cost and
+parent, and push `nxt` with priority `new cost + Manhattan-to-goal`.
+
+Which food to chase? The scoring function:
+
+```python
+utility = w_p * (food.value / (1.0 + dist)) / 10.0     # big & near = good
+utility -= w_r * risk.get(food.risk, 0.4)              # risky food = bad
+if remaining < dist: utility -= 0.3                    # will expire before I arrive = bad
+```
+
+`w_p` grows with the LLM's `food_priority` hint and `w_r` with
+`risk_aversion × (1 − risk_tolerance)` — this is exactly **where the LLM's
+strategy (§5.14) plugs into A\***. Then (line 193–205) foods are tried
+best-score-first, each path must pass `route_is_survivable()` (same
+pocket check as BFS), and the survival fallback is again tail-chasing
+(line 213–222).
+
+**Tell sir:** *"A\* keeps a min-heap ordered by g+h with an admissible
+Manhattan heuristic, adds a turn penalty for smooth paths, targets food by
+value-over-distance adjusted by LLM strategy weights, re-plans every tick,
+and validates each candidate route with a flood-fill escape check."*
+
+### 5.23.4 RL (DQN) — the learned agent (`agents/rl_agent.py`)
+
+**Role:** the neural-network player. It doesn't search or follow rules —
+it *learned* which action pays off most from self-play (training described
+in §5.12; this is the *playing* half).
+
+**Plain words:** compress the board into 30 numbers, feed them to the
+network, get 4 Q-values ("how good is each move, from experience"), play
+the highest.
+
+```python
+obs = self.obs_builder.build(state, snake_id, view)          # 30 floats
+with torch.no_grad():                                        # playing, not learning
+    tensor = torch.from_numpy(obs.astype(np.float32)).to(self.trainer.device)
+    q = self._net(tensor.unsqueeze(0)).squeeze(0)            # 30 → 4 outputs
+q_values = {action: float(q[int(action)]) for action in ALL_ACTIONS}
+ranked = sorted(ALL_ACTIONS, key=lambda a: q_values[a], reverse=True)
+action = ranked[0]                                           # the greedy choice
+```
+
+Line by line:
+- `obs_builder.build` turns the world into the fixed 30-number observation
+  (danger flags, direction, food angles/distances — layout in §5.7);
+- `torch.no_grad()` = "no training maths, just a forward pass";
+- `unsqueeze(0)` adds the batch dimension (the network expects a *batch*
+  of observations, we give it one); the output `q` holds one score per
+  action;
+- the best action is simply the argmax of the 4 Q-values.
+
+Two honest touches: `describe()` reports *"DQN (untrained: random init)"*
+until real training happens (line 64–67), and the note at line 91 says
+untrained actions are essentially random.
+
+**Where the strategy meets the network — the risk gate** (`decision_manager.py:314`).
+When an LLM strategy asks for caution, the DQN's ranking (not just its top
+pick) is filtered:
+
+```python
+min_area = me.length * (0.8 + 0.9 * hints.survival_priority)
+min_area *= 1.0 - 0.5 * hints.risk_tolerance
+for action in ranking:                        # Q-best → Q-worst
+    report = reports.get(action)
+    if report.safe and report.free_area >= min_area:
+        gated = action; break                 # first safe-enough move wins
+```
+
+Line by line: compute the minimum free space the strategy demands (more
+`survival_priority` → bigger demand; more `risk_tolerance` → smaller);
+walk the Q-value ranking and play the first action that is safe **and**
+spacious. The network proposes; the strategy and the safety layer dispose.
+
+**Tell sir:** *"The DQN maps the 30-float observation through a
+30-128-128-4 MLP trained with Double DQN and a replay buffer; at play time
+we take the greedy action, and a strategy-driven risk gate re-ranks the
+Q-values by required escape space before the safety validator has the
+final word."*
+
+### 5.23.5 Hybrid — the three-minds agent (`decision_manager.py:353`)
+
+**Role:** the "committee" — it asks the DQN *and* A\* *and* the free-space
+calculation, converts each answer to a 0–1 score, and blends them with
+configurable weights. The weights themselves are modulated by the LLM's
+strategy hints, which is why this mode is the flagship of the
+"LLM-enhanced" title.
+
+```python
+rl_decision = self.rl_agent.decide(...)       # mind 1: learned values
+astar_decision = self.astar_agent.decide(...) # mind 2: planned path
+w_path *= 0.4 + 1.2 * hints.food_priority     # LLM: hungry → trust the path more
+w_space *= 0.5 + 1.0 * hints.survival_priority # LLM: scared → trust space more
+w_rl, w_path, w_space = w_rl / total, w_path / total, w_space / total   # normalize to sum 1
+```
+
+Line by line: run both agents; scale the path/space weights by the LLM's
+appetites; normalize so the three weights always sum to 1 (a fair mix).
+
+```python
+def q_norm(a): ...  (q[a] - lo) / (hi - lo)    # squash Q-values to 0..1
+path_term  = 1.0 - dist(a) / d_max             # 1 = moves closest to target
+space_term = reports[a].free_area / area_max   # 1 = most breathing room
+scores[a] = w_rl * q_norm(a) + w_path * path_term + w_space * space_term
+best = max(scores, key=lambda a: scores[a])
+```
+
+Line by line: each ingredient is normalized to 0–1 (otherwise the raw
+Q-value, which can be any size, would drown the others), then the weighted
+sum picks the winner. All of this happens **only over `safe` actions** —
+the safety filter ran before the blending.
+
+**Tell sir:** *"Hybrid scores every safe action as a weighted blend of
+normalized DQN Q-values, progress toward A\*'s chosen target, and free
+space after the move; the LLM strategy scales the weights each decision,
+so one brain sets the priorities while the three specialists vote."*
+
+### 5.23.6 The LLM modes (`llm_astar`, `llm_rl`) — strategy, not moves
+
+There is no separate "LLM algorithm" for moving — by design. Every few
+seconds (config: `min_interval_seconds`) the `StrategyWorker` thread
+(§5.14) sends a JSON snapshot of the board to the local LLM and gets back a
+**posture**: a strategy name, three weights (`food_priority`,
+`risk_tolerance`, `survival_priority`), and an optional food to pin. Those
+weights flow straight into the formulas you saw above: A\*'s `score_food`
+(w_p, w_r), the risk gate's `min_area`, the hybrid's weight scaling. The
+LLM is the **general**; A\*/DQN/hybrid are the **soldiers**; the safety
+validator is the **law**. If the general is silent (no Ollama, timeout,
+bad JSON), `fallback_strategy()` supplies the same shape of hints — so the
+soldiers never stop marching.
+
 # 6. Every command, explained
 
 Run all of these from the project folder `~/snake-game`.
@@ -1304,6 +1629,36 @@ Run all of these from the project folder `~/snake-game`.
 *What it does:* creates `.venv` (an isolated Python), installs CPU-only
 PyTorch from PyTorch's own index (small download), then the rest of
 `requirements.txt`. You only run this once (or after changing requirements).
+
+### Moving the project to Windows (one command)
+
+To play on a Windows computer:
+
+1. **Install Python once** (only if that PC doesn't have it): download from
+   [python.org/downloads](https://www.python.org/downloads/) and in the
+   installer **tick "Add python.exe to PATH"**. That tick matters.
+2. **Copy the project folder** to the Windows PC (USB drive, Google Drive,
+   anything). Tip: you do *not* need to copy `.venv/` (it's Linux-only and
+   will be re-created) or `data/` — but do keep `models/` if you want your
+   trained checkpoint.
+3. **Double-click `run_windows.bat`** (or run it in a terminal). That is
+   the whole thing. On the **first run it**:
+   - finds Python,
+   - creates the `.venv` virtual environment,
+   - downloads **all** requirements in one go: CPU PyTorch → pygame-ce →
+     numpy → matplotlib,
+   - then starts the game.
+   Every later run skips the download and starts instantly.
+
+Optional LLM on Windows: install Ollama from <https://ollama.com> (plain
+installer), then `ollama pull qwen3:4b` in Command Prompt. The game is
+fully playable without it.
+
+*Honest note (also printed inside the scripts):* these Windows scripts were
+written on Linux and never executed on a real Windows machine. If anything
+fails, read the error message — the script prints exactly which step to
+retry — and see `docs/WINDOWS_SETUP.md` for the manual commands.
+`setup_windows.ps1` does the same install for PowerShell users.
 
 ### Everyday launch
 

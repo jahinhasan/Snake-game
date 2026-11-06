@@ -11,11 +11,11 @@ import os
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-import pytest  # noqa: E402
+import pytest
 
 pygame = pytest.importorskip("pygame", reason="pygame not installed")
 
-from snake_arena.config import AppConfig  # noqa: E402
+from snake_arena.config import AppConfig
 
 
 @pytest.fixture(scope="module")
@@ -190,18 +190,24 @@ def test_human_up_arrow_turns_the_snake(app):
 def test_settings_llm_status_label_reports_ollama(app, monkeypatch):
     """The LLM Planner section shows a real reachability status, probed in the
     background so the UI never freezes, with honest text when Ollama is absent.
+
+    We patch the module-level ``_default_transport`` factory (not the class
+    attribute: every OllamaClient sets its own ``self._transport`` in
+    __init__, which would shadow a class-level patch). This keeps the test
+    deterministic even when a REAL Ollama server is running on this machine.
     """
     import time as time_mod
 
     from snake_arena.config import LLMConfig
-    from snake_arena.llm.ollama_client import OllamaClient, OllamaUnavailable
+    from snake_arena.llm import ollama_client as oc
     from snake_arena.ui.settings import SettingsScreen
 
-    # Deterministic probe result: pretend Ollama is unreachable.
-    def unavailable(self, path, payload, timeout):
-        raise OllamaUnavailable("cannot reach Ollama (test)")
+    def dead_transport(base_url):
+        def transport(path, payload, timeout):
+            raise oc.OllamaUnavailable(f"cannot reach Ollama at {base_url} (test)")
+        return transport
 
-    monkeypatch.setattr(OllamaClient, "_transport", unavailable, raising=False)
+    monkeypatch.setattr(oc, "_default_transport", dead_transport)
 
     cfg: AppConfig = app.config
     original = cfg.llm
