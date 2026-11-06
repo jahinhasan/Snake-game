@@ -73,9 +73,9 @@ class BaseAgent(ABC):
     @abstractmethod
     def decide(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
-        view: "StateView | None" = None,
+        view: StateView | None = None,
         hints: StrategyHints | None = None,
     ) -> AgentDecision:
         """Propose an action for ``snake_id`` for the current tick."""

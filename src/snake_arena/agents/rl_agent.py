@@ -16,15 +16,14 @@ import numpy as np
 import torch
 
 from ..game.environment import OBS_SIZE, ObservationBuilder
-from ..game.types import ALL_ACTIONS, Action
-from ..rl.network import QNetwork, pick_device
+from ..game.types import ALL_ACTIONS
 from ..rl.trainer import DQNTrainer
 from .base import AgentDecision, BaseAgent, StrategyHints
 
 if TYPE_CHECKING:
+    from ..config import RLConfig
     from ..game.environment import StateView
     from ..game.state import GameState
-    from ..config import RLConfig
 
 
 class RLAgent(BaseAgent):
@@ -35,7 +34,7 @@ class RLAgent(BaseAgent):
     def __init__(
         self,
         trainer: DQNTrainer | None = None,
-        rl_cfg: "RLConfig | None" = None,
+        rl_cfg: RLConfig | None = None,
         device: torch.device | None = None,
     ) -> None:
         self.trainer = trainer or DQNTrainer(rl_cfg, obs_size=OBS_SIZE, device=device)
@@ -46,7 +45,7 @@ class RLAgent(BaseAgent):
     # -- checkpoint helpers ----------------------------------------------------
 
     @classmethod
-    def from_checkpoint(cls, path, rl_cfg: "RLConfig | None" = None) -> "RLAgent":
+    def from_checkpoint(cls, path, rl_cfg: RLConfig | None = None) -> RLAgent:
         trainer = DQNTrainer(rl_cfg, obs_size=OBS_SIZE)
         trainer.load(path)
         return cls(trainer=trainer)
@@ -70,9 +69,9 @@ class RLAgent(BaseAgent):
 
     def decide(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
-        view: "StateView | None" = None,
+        view: StateView | None = None,
         hints: StrategyHints | None = None,
     ) -> AgentDecision:
         t0 = time.perf_counter()
@@ -110,7 +109,7 @@ class RLAgent(BaseAgent):
         )
 
 
-def build_view(state: "GameState", snake_id: str):
+def build_view(state: GameState, snake_id: str):
     from ..game.environment import build_state_view
 
     return build_state_view(state, snake_id)

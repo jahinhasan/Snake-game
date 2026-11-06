@@ -31,7 +31,7 @@ class AudioManager:
             self.enabled = True
             self._build_sounds()
             self.apply_volume()
-        except Exception as exc:  # noqa: BLE001 - any mixer failure disables audio
+        except Exception as exc:
             log.info("Audio disabled (%s)", exc)
 
     def _tone(self, freq: float, seconds: float, volume: float = 0.5, decay: bool = True,
@@ -71,7 +71,7 @@ class AudioManager:
         for name, data in specs.items():
             try:
                 self.sounds[name] = pygame.sndarray.make_sound(data)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.debug("Could not synthesize sound '%s': %s", name, exc)
 
     def apply_volume(self) -> None:
@@ -88,13 +88,13 @@ class AudioManager:
         if sound is not None:
             try:
                 sound.play()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
     def shutdown(self) -> None:
         if self.enabled:
             try:
                 self._pygame.mixer.quit()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
             self.enabled = False

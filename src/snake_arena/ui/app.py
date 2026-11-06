@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from .. import PROJECT_NAME, __version__
+from .. import PROJECT_NAME
 from ..config import AppConfig
 from ..llm.ollama_client import OllamaClient
 from ..llm.strategist import StrategyWorker
 from .audio import AudioManager
 from .components import Widget
-from .theme import COLORS, Fonts
+from .theme import Fonts
 
 if TYPE_CHECKING:
     from ..agents.rl_agent import RLAgent
@@ -24,7 +24,7 @@ log = logging.getLogger("snake_arena.app")
 class Screen:
     """A full-window view; screens own their widget list and layout."""
 
-    def __init__(self, app: "App") -> None:
+    def __init__(self, app: App) -> None:
         self.app = app
         self.widgets: list[Widget] = []
 
@@ -76,7 +76,7 @@ class App:
         self.screens: list[Screen] = []
         self._llm_client: OllamaClient | None = None
         self._llm_worker: StrategyWorker | None = None
-        self._rl_agent_cache: dict[str, "RLAgent"] = {}
+        self._rl_agent_cache: dict[str, RLAgent] = {}
 
     # -- screen stack ----------------------------------------------------------
 
@@ -125,7 +125,7 @@ class App:
             self._llm_worker.start()
         return self._llm_worker
 
-    def rl_agent(self, reload: bool = False) -> "RLAgent":
+    def rl_agent(self, reload: bool = False) -> RLAgent:
         """Shared RL agent (checkpoint loaded once per app run)."""
         key = self.config.agent.rl_checkpoint
         if reload or key not in self._rl_agent_cache:
@@ -173,7 +173,6 @@ class App:
     def _make_icon() -> pygame.Surface:
         icon = pygame.Surface((32, 32), pygame.SRCALPHA)
         icon.fill((13, 17, 23, 255))
-        body = [(6, 16), (10, 12), (14, 12), (18, 16), (22, 16), (24, 18), (22, 20), (16, 20), (10, 20), (6, 20)]
         pygame.draw.polygon(icon, (88, 166, 255), [(x * 32 // 32, y) for x, y in [(2, 10), (6, 6), (10, 8), (14, 12), (22, 12), (26, 16), (22, 20), (12, 20), (4, 18), (2, 14)]])
         pygame.draw.circle(icon, (126, 231, 135), (26, 8), 4)
         pygame.draw.circle(icon, (240, 246, 252), (25, 6), 1)
@@ -188,7 +187,7 @@ def run_app(config: AppConfig) -> int:
         return 1
     try:
         app.run()
-    except Exception:  # noqa: BLE001 - crash reports beat silent death
+    except Exception:
         log.exception("Unhandled error in main loop")
         return 1
     return 0

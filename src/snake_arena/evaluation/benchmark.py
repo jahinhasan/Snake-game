@@ -18,15 +18,15 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from ..agents.factory import build_manager
 from ..config import AppConfig
 from ..game.engine import GameEngine, SnakeSpec
 from ..game.types import Action
 from ..llm.ollama_client import OllamaClient
-from .metrics import EpisodeRecord, summarize, summary_rows
+from .metrics import EpisodeRecord, summarize
 
 log = logging.getLogger("snake_arena.benchmark")
 
@@ -247,9 +247,7 @@ class BenchmarkRunner:
             steps += 1
         sa, sb = engine.state.snakes["a"], engine.state.snakes["b"]
         winner = None
-        if engine.outcome == "survivor_win" and engine.winner_ids:
-            winner = engine.winner_ids[0]
-        elif engine.outcome == "timeout" and len(engine.winner_ids) == 1:
+        if engine.outcome == "survivor_win" and engine.winner_ids or engine.outcome == "timeout" and len(engine.winner_ids) == 1:
             winner = engine.winner_ids[0]
         return {
             "agent_a": agent_a,

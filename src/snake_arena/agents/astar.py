@@ -139,7 +139,7 @@ class AStarAgent(BaseAgent):
 
     # -- scoring -------------------------------------------------------------
 
-    def score_food(self, food: "Food", view: StateView, hints: StrategyHints) -> float:
+    def score_food(self, food: Food, view: StateView, hints: StrategyHints) -> float:
         """Documented utility: value over distance, minus risk and urgency.
 
         U(f) = w_p * value / (1 + dist) / 10
@@ -163,7 +163,7 @@ class AStarAgent(BaseAgent):
 
     def decide(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView | None = None,
         hints: StrategyHints | None = None,

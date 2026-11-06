@@ -40,7 +40,6 @@ Documented, deterministic arbitration policy
 from __future__ import annotations
 
 import logging
-import math
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -59,10 +58,10 @@ from ..llm.strategist import (
 )
 from ..safety.validator import SafetyReport, SafetyValidator
 from .astar import AStarAgent
-from .base import AgentDecision, BaseAgent, StrategyHints
+from .base import AgentDecision, StrategyHints
 from .bfs import BFSAgent
-from .rule_based import RuleBasedAgent
 from .rl_agent import RLAgent
+from .rule_based import RuleBasedAgent
 
 if TYPE_CHECKING:
     from ..game.state import GameState
@@ -107,7 +106,7 @@ class DecisionManager:
         rl_agent: RLAgent | None = None,
         validator: SafetyValidator | None = None,
         strategist_worker: StrategyWorker | None = None,
-        llm_client: "OllamaClient | None" = None,
+        llm_client: OllamaClient | None = None,
     ) -> None:
         self.mode = mode
         self.config = config
@@ -156,10 +155,10 @@ class DecisionManager:
 
     # -- strategy ---------------------------------------------------------------
 
-    def _snapshot(self, state: "GameState", snake_id: str, view: StateView, safe_routes: dict[str, bool] | None) -> dict:
+    def _snapshot(self, state: GameState, snake_id: str, view: StateView, safe_routes: dict[str, bool] | None) -> dict:
         return build_snapshot(state, snake_id, view, safe_routes)
 
-    def _hints(self, state: "GameState", snake_id: str, view: StateView, safe_routes: dict[str, bool] | None) -> StrategyHints:
+    def _hints(self, state: GameState, snake_id: str, view: StateView, safe_routes: dict[str, bool] | None) -> StrategyHints:
         """Strategy from the worker (UI), sync client (benchmark), or fallback."""
         if not self.uses_llm:
             hints = _default_hints()
@@ -205,7 +204,7 @@ class DecisionManager:
             error = None
             self.stats["llm_calls"] += 1
             self.stats["llm_latency_ms_total"] += self.llm_client.last_latency_ms
-        except Exception as exc:  # noqa: BLE001 - every failure degrades gracefully
+        except Exception as exc:
             strategy = fallback_strategy(snapshot)
             hints = _fallback_hints(strategy)
             error = str(exc)
@@ -225,7 +224,7 @@ class DecisionManager:
 
     # -- decision ----------------------------------------------------------------
 
-    def decide(self, state: "GameState", snake_id: str) -> Action:
+    def decide(self, state: GameState, snake_id: str) -> Action:
         t0 = time.perf_counter()
         view = build_state_view(state, snake_id)
         reports = self.validator.evaluate_all(state, snake_id, view)
@@ -290,7 +289,7 @@ class DecisionManager:
 
     def _policy(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView,
         hints: StrategyHints,
@@ -313,7 +312,7 @@ class DecisionManager:
 
     def _gate_rl(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView,
         hints: StrategyHints,
@@ -352,7 +351,7 @@ class DecisionManager:
 
     def _hybrid(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView,
         hints: StrategyHints,
@@ -471,7 +470,7 @@ def _strategy_hints(strategy: Strategy, latency_ms: float) -> StrategyHints:
         target_food_id=strategy.target_food_id,
         reason=strategy.reason,
         source="llm",
-        latency_ms=latency,
+        latency_ms=latency_ms,
     )
 
 

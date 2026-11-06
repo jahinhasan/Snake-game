@@ -19,9 +19,9 @@ from typing import TYPE_CHECKING
 
 from ..game.collision import flood_fill_count
 from ..game.environment import StateView, build_state_view
-from ..game.types import DIR_VECTORS, Action, Cell, manhattan
-from .base import AgentDecision, BaseAgent, StrategyHints
+from ..game.types import DIR_VECTORS, Cell, manhattan
 from .astar import _action_towards
+from .base import AgentDecision, BaseAgent, StrategyHints
 
 if TYPE_CHECKING:
     from ..game.food import Food
@@ -82,7 +82,7 @@ class BFSAgent(BaseAgent):
 
     def decide(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView | None = None,
         hints: StrategyHints | None = None,

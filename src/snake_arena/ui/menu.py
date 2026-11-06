@@ -12,7 +12,7 @@ from ..config import AppConfig
 from ..game.engine import GameEngine, SnakeSpec
 from ..game.types import Action
 from .app import App, Screen
-from .components import Button, Dropdown, Label, Slider, draw_widgets, send_event
+from .components import Button, Dropdown, Label, Slider, draw_widgets
 from .theme import COLORS, panel, rgb, text
 
 

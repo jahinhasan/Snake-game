@@ -10,14 +10,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .types import Action, Cell
+from .types import Cell
 
 if TYPE_CHECKING:
-    from .state import GameState
     from .snake import Snake
+    from .state import GameState
 
 
-def will_tail_vacate(snake: "Snake", growth_now: int = 0) -> bool:
+def will_tail_vacate(snake: Snake, growth_now: int = 0) -> bool:
     """True if the snake's tail cell becomes free on the next move.
 
     The tail is retained when the snake still owes growth from earlier food
@@ -28,7 +28,7 @@ def will_tail_vacate(snake: "Snake", growth_now: int = 0) -> bool:
     return snake.pending_growth == 0 and growth_now == 0
 
 
-def future_body(snake: "Snake", candidate_head: Cell, growth_now: int = 0) -> list[Cell]:
+def future_body(snake: Snake, candidate_head: Cell, growth_now: int = 0) -> list[Cell]:
     """The snake's body cells after moving ``candidate_head`` (head first)."""
     body = [candidate_head, *list(snake.body)]
     if will_tail_vacate(snake, growth_now):
@@ -36,7 +36,7 @@ def future_body(snake: "Snake", candidate_head: Cell, growth_now: int = 0) -> li
     return body
 
 
-def planning_blocked_cells(state: "GameState", snake_id: str) -> set[Cell]:
+def planning_blocked_cells(state: GameState, snake_id: str) -> set[Cell]:
     """Cells that should be treated as walls when planning for ``snake_id``.
 
     Includes every living snake's body minus tails that will vacate (tails of
@@ -55,8 +55,8 @@ def planning_blocked_cells(state: "GameState", snake_id: str) -> set[Cell]:
 
 
 def is_deadly_for(
-    state: "GameState",
-    snake: "Snake",
+    state: GameState,
+    snake: Snake,
     cell: Cell,
     own_growth: int = 0,
     treat_opponent_head_vacated: bool = True,
@@ -122,7 +122,7 @@ def flood_fill_count(
     return count
 
 
-def danger_cells(state: "GameState", snake_id: str) -> set[Cell]:
+def danger_cells(state: GameState, snake_id: str) -> set[Cell]:
     """Heuristic danger overlay: cells the opponent can reach in one move,
     plus the snake's own body-adjacent corridors it should not enter."""
     dangers: set[Cell] = set()

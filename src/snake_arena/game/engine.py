@@ -11,15 +11,15 @@ from __future__ import annotations
 import logging
 import random
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 from ..config import AppConfig
 from .collision import future_body
 from .food import Food, FoodCatalog, FoodStats, FoodSystem
-from .state import GameState
 from .snake import Snake
+from .state import GameState
 from .types import VALID_ACTIONS, Action, Cell
 
 log = logging.getLogger("snake_arena.engine")
@@ -107,7 +107,7 @@ class GameEngine:
     # -- construction ------------------------------------------------------
 
     @classmethod
-    def from_config(cls, config: AppConfig, snake_specs: Iterable[SnakeSpec] | None = None, seed: int | None = None) -> "GameEngine":
+    def from_config(cls, config: AppConfig, snake_specs: Iterable[SnakeSpec] | None = None, seed: int | None = None) -> GameEngine:
         resolved_seed = seed if seed is not None else config.game.seed
         return cls(
             width=config.board.width,
@@ -268,10 +268,7 @@ class GameEngine:
         alive_after = state.living_snakes()
         if dead:
             result.done = True
-            if len(alive_after) == 1 and len(self.specs) > 1:
-                result.winners = [alive_after[0].id]
-                result.outcome = "survivor_win"
-            elif len(alive_after) == 1:
+            if len(alive_after) == 1 and len(self.specs) > 1 or len(alive_after) == 1:
                 result.winners = [alive_after[0].id]
                 result.outcome = "survivor_win"
             elif not alive_after:

@@ -42,7 +42,7 @@ def build_rl_agent(config: AppConfig, load_checkpoint: bool = True) -> RLAgent:
             try:
                 payload = agent.load_checkpoint(path)
                 log.info("Loaded RL checkpoint %s (%s)", path, describe_payload(payload))
-            except Exception as exc:  # noqa: BLE001 - bad checkpoint must not crash
+            except Exception as exc:
                 log.error("Failed to load checkpoint %s: %s (using untrained agent)", path, exc)
         else:
             log.info("No RL checkpoint at %s; running with an untrained network.", path)

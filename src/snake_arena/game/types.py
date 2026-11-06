@@ -6,8 +6,8 @@ Kept import-free from other game modules so that ``snake``, ``food`` and
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from enum import IntEnum
-from typing import Iterator
 
 # A grid cell is an (x, y) tuple of integers. Tuples are hashable and cheap,
 # which makes them ideal for set-based collision and pathfinding code.

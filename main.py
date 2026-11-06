@@ -21,9 +21,9 @@ from pathlib import Path
 # Allow ``python main.py`` from a source checkout without installation.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-from snake_arena import PROJECT_NAME, __version__  # noqa: E402
-from snake_arena.config import load_app_config  # noqa: E402
-from snake_arena.utils import paths  # noqa: E402
+from snake_arena import PROJECT_NAME, __version__
+from snake_arena.config import load_app_config
+from snake_arena.utils import paths
 
 
 def _setup_logging(verbose: bool) -> None:

@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 from ..persistence.storage import run_id, save_json_atomic, versions_dict, write_csv
 from ..utils import paths
 from .benchmark import AGENT_LABELS
-from .metrics import summary_rows
 
 log = logging.getLogger("snake_arena.experiments")
 

@@ -60,10 +60,10 @@ _RIGHT_OF: dict[Action, Action] = {v: k for k, v in _LEFT_OF.items()}
 class StateView:
     """Per-tick cached decision context for one snake."""
 
-    state: "GameState"
+    state: GameState
     snake_id: str
-    me: "Snake"
-    opponents: list["Snake"]
+    me: Snake
+    opponents: list[Snake]
     blocked: set[Cell] = field(default_factory=set)  # tail-aware planning walls
     foods_sorted: list[Food] = field(default_factory=list)
     danger: set[Cell] = field(default_factory=set)
@@ -86,7 +86,7 @@ def food_priority(food: Food, head: Cell) -> float:
     return food.value / (1.0 + manhattan(food.pos, head))
 
 
-def build_state_view(state: "GameState", snake_id: str) -> StateView:
+def build_state_view(state: GameState, snake_id: str) -> StateView:
     me = state.snakes[snake_id]
     head = me.head
     view = StateView(
@@ -121,7 +121,7 @@ class ObservationBuilder:
     def __init__(self, flood_limit: int = 900) -> None:
         self.flood_limit = flood_limit
 
-    def build(self, state: "GameState", snake_id: str, view: StateView | None = None) -> np.ndarray:
+    def build(self, state: GameState, snake_id: str, view: StateView | None = None) -> np.ndarray:
         view = view or build_state_view(state, snake_id)
         me: Snake = view.me
         head = me.head
@@ -199,7 +199,7 @@ class SnakeEnv:
         self._last_view: StateView | None = None
 
     @property
-    def state(self) -> "GameState":
+    def state(self) -> GameState:
         return self.engine.state
 
     def reset(self, seed: int | None = None) -> np.ndarray:

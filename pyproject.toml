@@ -17,14 +17,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "pygame>=2.5",
+    "pygame-ce>=2.5.6,<3.0",
     "numpy>=1.26",
     "matplotlib>=3.8",
     "torch>=2.2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
 
 [project.scripts]
 snake-arena = "snake_arena.app:run"
@@ -42,3 +42,21 @@ filterwarnings = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+# Bug-catching rules plus import hygiene; keep the style-nitpick families
+# (naming, dict literals, exception style, ...) out so findings stay signal.
+select = [
+    "E4",   # pycodestyle imports
+    "E7",   # pycodestyle comparisons / statements
+    "E9",   # pycodestyle runtime errors (syntax, flake8-executable scope)
+    "F",    # pyflakes: undefined names, unused imports/variables
+    "I",    # isort: import sorting
+    "W",    # whitespace warnings
+    "RUF100", # unused `# noqa` directives
+]
+ignore = [
+    "E402",  # module imports after the sys.path shim - deliberate project pattern
+    "E731",  # lambda factories (env_factory etc.) are fine
+    "E741",  # ambiguous variable name (l/I) - fine for grid math
+]

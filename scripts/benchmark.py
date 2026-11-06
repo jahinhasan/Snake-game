@@ -58,7 +58,6 @@ def run_benchmark(config, episodes: int, agents: list[str] | None = None) -> int
     if meta.get("llm_available") is False:
         print(f"NOTE: {meta.get('llm_note', 'LLM unavailable; LLM agents used the fallback strategy.')}")
     print(f"\nResults ({' + '.join(AGENT_LABELS.get(a, a) for a in agents)}):")
-    header = ("agent", "eps", "mean", "median", "std", "surv", "trap/1k", "ms")
     print(f"  {'agent':<14}{'eps':>5}{'mean':>8}{'median':>8}{'std':>7}{'surv':>7}{'trap/1k':>9}{'ms':>7}")
     for row in benchmark_rows(results):
         print(f"  {row['agent']:<14}{row['episodes']:>5}{row['mean_score']:>8.1f}"

@@ -18,7 +18,7 @@ from ..agents.factory import build_manager
 from ..config import AppConfig
 from ..evaluation.benchmark import AGENT_LABELS
 from ..game.engine import GameEngine, SnakeSpec
-from ..game.types import Action, DIR_VECTORS
+from ..game.types import DIR_VECTORS, Action
 from ..persistence import history as history_mod
 from ..safety.validator import SafetyValidator
 from .app import App, Screen
@@ -268,7 +268,6 @@ class ArenaScreen(Screen):
     # -- layout ----------------------------------------------------------------
 
     def layout(self) -> None:
-        from .components import Label
 
         w, h = self.app.screen.get_size()
         self.panel_w = 320

@@ -16,7 +16,6 @@ from ..config import AppConfig
 from ..game.environment import SnakeEnv
 from ..rl.checkpoints import CheckpointError, describe_checkpoint
 from ..rl.trainer import DQNTrainer, TrainingControl, training_worker
-from ..utils import paths
 from .app import App, Screen
 from .components import Button, Chart, Label, TextInput, draw_widgets, send_event
 from .theme import COLORS, rgb, text
@@ -134,7 +133,7 @@ class TrainingDashboard(Screen):
         try:
             path = self.trainer.save(self._checkpoint_path())
             self.checkpoint_note = f"saved: {path.name} ({self.trainer.episodes_done} episodes)"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self.checkpoint_note = f"save failed: {exc}"
 
     def _load(self) -> None:
@@ -159,7 +158,7 @@ class TrainingDashboard(Screen):
         cfg = self.app.config
 
         def work() -> None:
-            env_factory = lambda: SnakeEnv(  # noqa: E731
+            env_factory = lambda: SnakeEnv(
                 width=cfg.training.board_width, height=cfg.training.board_height,
                 max_foods=cfg.game.max_foods, max_steps=cfg.rl.max_episode_steps,
             )

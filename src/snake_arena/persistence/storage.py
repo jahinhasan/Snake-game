@@ -115,24 +115,24 @@ def versions_dict() -> dict[str, str]:
         import numpy
 
         info["numpy"] = numpy.__version__
-    except Exception:  # noqa: BLE001
+    except Exception:
         info["numpy"] = "unavailable"
     try:
         import torch
 
         info["torch"] = torch.__version__
-    except Exception:  # noqa: BLE001
+    except Exception:
         info["torch"] = "unavailable"
     try:
         import pygame
 
         info["pygame"] = pygame.version.ver
-    except Exception:  # noqa: BLE001
+    except Exception:
         info["pygame"] = "unavailable"
     try:
         from .. import __version__
 
         info["snake_arena"] = __version__
-    except Exception:  # noqa: BLE001
+    except Exception:
         info["snake_arena"] = "unknown"
     return info

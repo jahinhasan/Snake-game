@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import torch
@@ -61,7 +61,7 @@ class TrainingHistory:
         }
 
     @classmethod
-    def from_dict(cls, data: dict | None) -> "TrainingHistory":
+    def from_dict(cls, data: dict | None) -> TrainingHistory:
         if not data:
             return cls()
         hist = cls(
@@ -127,7 +127,7 @@ def load_checkpoint(path: Path, expected_obs_size: int | None = None) -> dict:
         raise CheckpointError(f"Checkpoint not found: {path}")
     try:
         payload = torch.load(path, map_location="cpu", weights_only=False)
-    except Exception as exc:  # noqa: BLE001 - corrupt/partial files must not crash
+    except Exception as exc:
         raise CheckpointError(f"Could not read checkpoint {path}: {exc}") from exc
     if not isinstance(payload, dict) or "schema_version" not in payload:
         raise CheckpointError(f"File is not a snake-arena checkpoint: {path}")

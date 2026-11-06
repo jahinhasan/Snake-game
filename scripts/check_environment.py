@@ -17,7 +17,7 @@ for _p in (str(PROJECT_ROOT), str(PROJECT_ROOT / "src")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from snake_arena import PROJECT_NAME, __version__  # noqa: E402
+from snake_arena import PROJECT_NAME, __version__
 
 
 def _line(label: str, ok: bool, detail: str = "") -> bool:
@@ -51,13 +51,13 @@ def run_checks(config) -> int:
         import torch
 
         all_ok &= _line("torch", True, f"{torch.__version__} ({torch.get_num_threads()} threads)")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         all_ok &= _line("torch", False, f"import failed: {exc}")
     try:
         import matplotlib
 
         all_ok &= _line("matplotlib", True, matplotlib.__version__)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         all_ok &= _line("matplotlib", False, f"import failed: {exc} (charts disabled)")
 
     print("\nConfiguration")
@@ -71,7 +71,7 @@ def run_checks(config) -> int:
         catalog = FoodCatalog.load(paths.default_foods_path())
         all_ok &= _line("food catalog", True,
                         ", ".join(f"{t.name} {t.value:+d}" for t in catalog.types.values()))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         all_ok &= _line("food catalog", False, str(exc))
 
     print("\nEngine smoke test")
@@ -89,13 +89,12 @@ def run_checks(config) -> int:
             engine.step({"ai": Action.RIGHT})
         all_ok &= _line("engine steps", True,
                         f"tick {engine.state.tick}, outcome {engine.outcome}, foods {len(engine.state.foods)}")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         all_ok &= _line("engine steps", False, str(exc))
 
     print("\nRL agent")
     try:
         from snake_arena.agents.factory import build_rl_agent
-        from snake_arena.rl.checkpoints import describe_checkpoint
 
         agent = build_rl_agent(config)
         if agent.trained:
@@ -104,7 +103,7 @@ def run_checks(config) -> int:
         else:
             detail = "no usable checkpoint - running with a random-init network (safety validator active)"
         all_ok &= _line("DQN builds", True, detail)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         all_ok &= _line("DQN builds", False, str(exc))
 
     print("\nLLM planner (optional)")

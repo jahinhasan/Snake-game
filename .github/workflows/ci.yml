@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          # The Windows target of run_windows.bat: verify the suite there too.
+          - os: windows-latest
+            python-version: "3.14"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Install CPU PyTorch first so the general install never pulls the
+      # multi-GB CUDA wheel (mirrors the comment in requirements.txt).
+      - name: Install CPU PyTorch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project + dev tools
+        run: pip install -r requirements.txt -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src tests scripts main.py
+
+      - name: Run tests
+        run: pytest -q

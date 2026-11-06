@@ -80,7 +80,7 @@ def get_font(kind: str, size: int) -> pygame.font.Font:
         try:
             font = pygame.font.SysFont(families, size)
             # SysFont falls back silently to the default font; that's fine.
-        except Exception:  # noqa: BLE001 - missing fonts must never crash
+        except Exception:
             font = pygame.font.Font(None, size)
         _fonts[key] = font
     return font

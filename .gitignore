@@ -18,6 +18,15 @@ data/logs/*
 models/*
 !models/.gitkeep
 
+# Tracked artifacts: the canonical trained DQN and one reference benchmark
+# session (7 agents x 20 episodes, charts included), so the paper's numbers
+# are reproducible straight from a fresh clone. Everything else stays local.
+!models/dqn_default.pt
+!data/benchmarks/
+data/benchmarks/*
+!data/benchmarks/cli-20261019-031440-dc8b/
+!data/benchmarks/tournament-20261019-031444-8f73/
+
 # OS / editor
 .DS_Store
 Thumbs.db

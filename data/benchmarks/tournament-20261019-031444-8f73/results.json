@@ -1,0 +1,86 @@
+{
+  "run_id": null,
+  "timestamp": 1792358084.7943137,
+  "meta": {
+    "kind": "tournament",
+    "agents": [
+      "rule_based",
+      "astar"
+    ],
+    "versions": {
+      "python": "3.14.8",
+      "platform": "Linux-7.2.10-arch1-1-x86_64-with-glibc2.44",
+      "numpy": "2.5.4",
+      "torch": "2.14.1+cpu",
+      "pygame": "2.5.8",
+      "snake_arena": "1.0.0"
+    }
+  },
+  "agents": {},
+  "records": [],
+  "tournament": {
+    "rounds": 2,
+    "matches": 2,
+    "draws": 1,
+    "wins": {
+      "rule_based": 0,
+      "astar": 1
+    },
+    "win_rate": {
+      "rule_based": 0.0,
+      "astar": 0.5
+    },
+    "match_records": [
+      {
+        "agent_a": "rule_based",
+        "agent_b": "astar",
+        "seed": 51001,
+        "steps": 40,
+        "outcome": "draw",
+        "winner": null,
+        "winner_agent": null,
+        "scores": {
+          "a": 200,
+          "b": 55
+        },
+        "deaths": {
+          "a": "head_on",
+          "b": "head_on"
+        },
+        "lengths": {
+          "a": 8,
+          "b": 8
+        },
+        "safety_interventions": {
+          "a": 0,
+          "b": 0
+        }
+      },
+      {
+        "agent_a": "rule_based",
+        "agent_b": "astar",
+        "seed": 51002,
+        "steps": 103,
+        "outcome": "survivor_win",
+        "winner": "b",
+        "winner_agent": "astar",
+        "scores": {
+          "a": 290,
+          "b": 115
+        },
+        "deaths": {
+          "a": "opponent",
+          "b": null
+        },
+        "lengths": {
+          "a": 14,
+          "b": 14
+        },
+        "safety_interventions": {
+          "a": 10,
+          "b": 0
+        }
+      }
+    ]
+  }
+}

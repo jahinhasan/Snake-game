@@ -1,0 +1,8 @@
+agent,episodes,mean_score,median_score,std_score,min_score,max_score,mean_steps,survival_rate,mean_length,trap_rate_per_1k_ticks,mean_decision_ms,llm_calls,llm_failures,llm_latency_ms_mean,llm_available,mean_path_length,win_rate
+rule_based,20,2225.5,2310.0,532.65,650,3010,1273.2,0.4,95.85,1.374,0.332,0,0,0.0,False,0.0,
+astar,20,2112.75,2137.5,553.33,1050,3135,906.8,0.0,91.3,2.095,0.672,0,0,0.0,False,0.0,
+bfs,20,2094.75,2010.0,549.82,995,3080,889.9,0.1,91.85,2.135,0.485,0,0,0.0,False,0.0,
+rl,20,2274.75,2312.5,467.75,1100,3025,1256.4,0.5,98.8,1.512,0.563,0,0,0.0,False,0.0,
+llm_astar,5,2208.0,2270.0,356.45,1545,2555,943.0,0.0,96.6,1.909,0.649,0,0,0.0,False,0.0,
+llm_rl,5,2331.0,2585.0,426.03,1550,2720,1356.8,0.6,101.4,1.474,0.645,0,0,0.0,False,0.0,
+hybrid,20,2465.75,2617.5,435.67,1100,2955,1347.0,0.5,107.35,2.19,0.745,0,0,0.0,False,0.0,

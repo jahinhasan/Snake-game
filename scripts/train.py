@@ -45,7 +45,7 @@ def run_training(config, episodes: int) -> int:
         try:
             payload = trainer.load(checkpoint)
             print(f"resumed from checkpoint: {describe_checkpoint(payload)}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"could not load checkpoint ({exc}); starting fresh")
 
     started = time.perf_counter()

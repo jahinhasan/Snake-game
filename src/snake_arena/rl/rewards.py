@@ -54,7 +54,7 @@ class RewardCalculator:
 
     def compute(
         self,
-        events: list["GameEvent"],
+        events: list[GameEvent],
         prev_dist: float | None,
         new_dist: float | None,
         death_reason: str | None,

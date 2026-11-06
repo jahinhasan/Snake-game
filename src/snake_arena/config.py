@@ -368,7 +368,7 @@ class AppConfig:
         return target
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "AppConfig":
+    def load(cls, path: Path | None = None) -> AppConfig:
         cfg_path = Path(path) if path else paths.default_config_path()
         cfg = cls()
         if not cfg_path.exists():

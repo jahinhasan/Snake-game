@@ -53,7 +53,7 @@ class SafetyValidator:
 
     def check(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         action: Action,
         view: StateView | None = None,
@@ -90,7 +90,7 @@ class SafetyValidator:
 
     def evaluate_all(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView | None = None,
     ) -> dict[Action, SafetyReport]:
@@ -98,7 +98,7 @@ class SafetyValidator:
 
     def safe_actions(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView | None = None,
     ) -> list[Action]:
@@ -107,7 +107,7 @@ class SafetyValidator:
 
     def select_safe_action(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         preferred: Action,
         fallback_order: list[Action] | None = None,
@@ -154,7 +154,7 @@ class SafetyValidator:
         # the engine resolve the unavoidable collision honestly.
         return preferred, SafetyReport(preferred, False, "no_safe_action", 0, rejected)
 
-    def risky_cells(self, state: "GameState", snake_id: str) -> set[Cell]:
+    def risky_cells(self, state: GameState, snake_id: str) -> set[Cell]:
         """Cells flagged as risky for visualization (would fail validation)."""
         view = build_state_view(state, snake_id)
         risky: set[Cell] = set()

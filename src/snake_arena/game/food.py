@@ -11,7 +11,7 @@ import json
 import logging
 import uuid
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -113,7 +113,7 @@ class FoodCatalog:
         return self.types[self._names[-1]]
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "FoodCatalog":
+    def load(cls, path: Path | None = None) -> FoodCatalog:
         """Load foods.json with schema validation and safe fallbacks."""
         food_path = Path(path) if path else None
         raw_types: list[dict[str, Any]]
@@ -211,7 +211,7 @@ class FoodSystem:
             shape=ftype.shape,
         )
 
-    def spawn_one(self, state: "GameState", rng) -> Food | None:
+    def spawn_one(self, state: GameState, rng) -> Food | None:
         """Spawn one random food item in a free cell, if any exists."""
         occupied = state.occupied_cells(include_food=True)
         free = [
@@ -228,11 +228,11 @@ class FoodSystem:
         state.foods.append(food)
         return food
 
-    def initialize(self, state: "GameState", rng) -> None:
+    def initialize(self, state: GameState, rng) -> None:
         for _ in range(self.max_foods):
             self.spawn_one(state, rng)
 
-    def maintain(self, state: "GameState", rng) -> list[Food]:
+    def maintain(self, state: GameState, rng) -> list[Food]:
         """Expire old food and refill to ``max_foods``; returns expired items."""
         expired = [f for f in state.foods if f.is_expired(state.tick)]
         if expired:

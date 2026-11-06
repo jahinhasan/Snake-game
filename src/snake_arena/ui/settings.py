@@ -11,7 +11,7 @@ import threading
 
 import pygame
 
-from ..config import AppConfig, load_app_config
+from ..config import load_app_config
 from ..evaluation.benchmark import AGENT_LABELS
 from .app import App, Screen
 from .components import (
@@ -65,7 +65,7 @@ class SettingsScreen(Screen):
         self.app.config.audio.volume = value
         try:
             self.app.audio.apply_volume(self.app.config.audio)
-        except Exception:  # noqa: BLE001 - audio is optional
+        except Exception:
             pass
 
     def _probe_llm(self) -> None:

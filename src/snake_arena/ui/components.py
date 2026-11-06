@@ -8,12 +8,10 @@ second pass (see Screen.draw_widgets) so overlays render above other rows.
 
 from __future__ import annotations
 
-import time
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import pygame
 
-from . import theme
 from . import theme
 from .theme import COLORS, Fonts, get_font, rgb, text
 
@@ -30,10 +28,10 @@ class Widget:
     def contains(self, pos: tuple[int, int]) -> bool:
         return self.visible and self.enabled and self.rect.collidepoint(pos)
 
-    def handle_event(self, event: pygame.event.Event) -> bool:  # noqa: ARG002
+    def handle_event(self, event: pygame.event.Event) -> bool:
         return False
 
-    def update(self, dt: float) -> None:  # noqa: ARG002
+    def update(self, dt: float) -> None:
         return None
 
     def draw(self, surface: pygame.Surface, fonts: Fonts) -> None:
@@ -537,7 +535,6 @@ class DataTable(Widget):
         for ratio in self.col_ratios:
             x_positions.append(x)
             x += int(inner.w * ratio)
-        hx = {name: i for i, name in enumerate(self.headers)}
         for i, header in enumerate(self.headers):
             text(surface, header, (x_positions[i], inner.y), font=self.header_font, color=COLORS.text_dim)
         theme.hline(surface, inner.y + 18, inner.x, inner.right)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import pygame
 
@@ -57,7 +57,7 @@ class ResultsScreen(Screen):
                 text_out = parse_analysis(raw)
                 self.analysis_lines = wrap_text(text_out, self.app.fonts.body, 760)
                 self.analysis_status = "done"
-            except Exception as exc:  # noqa: BLE001 - analysis is optional
+            except Exception as exc:
                 self.analysis_error = str(exc)[:120]
                 self.analysis_status = "failed"
 
@@ -144,7 +144,6 @@ class ResultsScreen(Screen):
                 text(surface, f"RL risk-gating activations: {ai.get('gating_activations')}",
                      (x0, y), font=self.app.fonts.small, color=COLORS.text_dim)
                 y += 20
-        llm_meta = self.record.get("llm", {}) or {}
         y += 6
         pygame.draw.line(surface, rgb(COLORS.border), (x0, y), (panel.right - 26, y))
         y += 12

@@ -11,7 +11,6 @@ training (UI worker thread), and greedy evaluation of checkpoints.
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -281,7 +280,7 @@ class DQNTrainer:
         self.target.load_state_dict(payload["target_state"])
         try:
             self.optimizer.load_state_dict(payload["optimizer_state"])
-        except Exception as exc:  # noqa: BLE001 - optimizer mismatch is non-fatal
+        except Exception as exc:
             log.warning("Optimizer state not restored (%s); continuing with fresh optimizer.", exc)
         self.history = TrainingHistory.from_dict(payload.get("history"))
         self.steps = int(payload.get("steps", 0))
@@ -330,12 +329,12 @@ def training_worker(
         trainer.history.total_steps = trainer.steps
         try:
             on_update(stats)
-        except Exception:  # noqa: BLE001 - UI callback must not kill training
+        except Exception:
             log.exception("Training UI callback failed")
         if autosave_path is not None and ep % max(1, autosave_every) == 0:
             try:
                 trainer.save(autosave_path)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("Autosave failed")
         if ep % max(1, eval_every) == 0:
             metrics = trainer.evaluate(
@@ -346,10 +345,10 @@ def training_worker(
             if on_eval is not None:
                 try:
                     on_eval(metrics)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     log.exception("Eval callback failed")
     if autosave_path is not None and not control.stop:
         try:
             trainer.save(autosave_path)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("Final save failed")

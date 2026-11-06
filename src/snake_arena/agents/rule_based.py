@@ -38,7 +38,7 @@ class RuleBasedAgent(BaseAgent):
 
     def decide(
         self,
-        state: "GameState",
+        state: GameState,
         snake_id: str,
         view: StateView | None = None,
         hints: StrategyHints | None = None,

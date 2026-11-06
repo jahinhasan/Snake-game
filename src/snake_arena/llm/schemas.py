@@ -75,8 +75,7 @@ def parse_strategy(obj: object) -> Strategy:
     if not isinstance(obj, dict):
         raise StrategyValidationError("response is not a JSON object")
 
-    unknown = set(obj) - set(_EXAMPLE)
-    # Unknown keys are tolerated (models add commentary fields) but required
+    # Unknown keys are tolerated (models add commentary fields); required
     # ones are checked strictly below.
 
     strategy = obj.get("strategy")

@@ -18,12 +18,13 @@ import json
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from ..agents.base import StrategyHints
 from .ollama_client import OllamaClient, OllamaError
-from .schemas import DEFAULT_STRATEGY, STRATEGIES, Strategy, parse_strategy
+from .schemas import Strategy, parse_strategy
 
 if TYPE_CHECKING:
     from ..game.environment import StateView
@@ -54,9 +55,9 @@ low when safe routes are scarce. Pick target_food_id only from the provided food
 
 
 def build_snapshot(
-    state: "GameState",
+    state: GameState,
     snake_id: str,
-    view: "StateView",
+    view: StateView,
     safe_routes: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     """Compact, relevant game snapshot (never full history)."""
@@ -291,7 +292,7 @@ class StrategyWorker(threading.Thread):
             if self.on_result is not None:
                 try:
                     self.on_result(result)
-                except Exception:  # noqa: BLE001 - UI must not kill the worker
+                except Exception:
                     log.exception("strategy callback failed")
 
     def _call_llm(self, snapshot: dict, h: str) -> StrategyResult:
