@@ -98,10 +98,14 @@ checkpoints in `models/`.
 
 ## Windows
 
-See [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) and use
-`setup_windows.ps1` / `run_windows.bat`. **Honest disclosure:** these scripts
-were authored for Windows but this project was developed and tested on Arch
-Linux only — the Windows path has not been executed by the author.
+**One file is enough:** on a fresh clone, double-click `run_windows.bat` —
+it installs Python (via winget, if missing), creates `.venv`, downloads all
+dependencies, installs Ollama + pulls `qwen3:4b`, and starts the game. See
+[docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for the manual equivalent.
+**Honest disclosure:** these scripts were authored for Windows but this
+project was developed and tested on Arch Linux only — the Windows path has
+not been executed by the author (the test suite itself *is* exercised on
+Windows by CI).
 
 ## Enabling the LLM planner
 

@@ -8,7 +8,25 @@
 > the Python code itself is cross-platform (pure Python + well-known
 > wheels), and the manual steps below are the reliable fallback.
 
-## Automated (PowerShell)
+## The one-command way (recommended)
+
+Just **double-click `run_windows.bat`**. On the first run it:
+
+1. finds Python 3.11+ (py launcher → PATH → installs Python 3.12 via
+   `winget` if none is found — no manual install needed on Windows 10/11);
+2. creates `.venv` and downloads **everything at once** (CPU PyTorch,
+   pygame-ce, numpy, matplotlib);
+3. installs **Ollama** via `winget` if missing, starts its server, and pulls
+   `qwen3:4b` (~2.4 GB, one time) so the LLM planner works — strictly
+   optional: if any of this fails the game still runs with the planner's
+   built-in fallback strategy;
+4. starts the game.
+
+Every later run jumps straight to step 4 and starts instantly. If Python is
+already installed yourself, make sure it is 3.11+ (matching
+`pyproject.toml`); winget users need nothing at all.
+
+## Automated (PowerShell alternative)
 
 ```powershell
 cd snake-game
@@ -25,7 +43,9 @@ Set-ExecutionPolicy -Scope Process Bypass   # if needed, this session only
    (`https://download.pytorch.org/whl/cpu`);
 4. `pip install -r requirements.txt`.
 
-`run_windows.bat` activates `.venv` and runs `python main.py`.
+`run_windows.bat` — when `.venv` already exists — just runs `python main.py`
+through it (this description applies to the older minimal launcher;
+the current one-click script does the full install too, see above).
 
 ## Manual steps (equivalent, and the reference if scripts fail)
 
