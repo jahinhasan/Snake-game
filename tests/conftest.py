@@ -9,11 +9,11 @@ SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-import pytest  # noqa: E402
+import pytest
 
-from snake_arena.config import AppConfig  # noqa: E402
-from snake_arena.game.engine import GameEngine, SnakeSpec  # noqa: E402
-from snake_arena.game.types import Action  # noqa: E402
+from snake_arena.config import AppConfig
+from snake_arena.game.engine import GameEngine, SnakeSpec
+from snake_arena.game.types import Action
 
 
 @pytest.fixture

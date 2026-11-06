@@ -104,7 +104,6 @@ def test_end_to_end_benchmark_artifacts(config, tmp_path, monkeypatch):
 
 def test_history_receives_played_games(config, tmp_path, monkeypatch):
     from snake_arena.persistence import history as history_mod
-    from snake_arena.utils import paths as paths_mod
 
     monkeypatch.setattr(history_mod, "history_path", lambda: tmp_path / "games.jsonl")
     manager = DecisionManager("astar", config, rl_agent=rl_agent)

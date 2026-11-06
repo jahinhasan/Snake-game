@@ -107,7 +107,7 @@ def test_trainer_collects_and_learns(tiny_rl_config):
 def test_greedy_evaluation_deterministic(tiny_rl_config):
     trainer = DQNTrainer(tiny_rl_config, obs_size=30, seed=2)
     trainer.episodes_done = 5  # pretend trained so history records nothing odd
-    factory = lambda: make_env(seed=8)  # noqa: E731
+    factory = lambda: make_env(seed=8)
     m1 = trainer.evaluate(factory, episodes=3, seed_base=500)
     m2 = trainer.evaluate(factory, episodes=3, seed_base=500)
     assert m1["episodes"] == 3

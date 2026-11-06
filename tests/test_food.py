@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from snake_arena.game.food import Food, FoodCatalog, FoodSystem, FoodStats
+from snake_arena.game.food import Food, FoodCatalog, FoodStats, FoodSystem
 from snake_arena.game.types import Action
 from snake_arena.utils import paths
 
@@ -14,7 +14,6 @@ from .conftest import make_engine
 def test_catalog_loads_five_types_with_valid_probabilities():
     catalog = FoodCatalog.load(paths.default_foods_path())
     assert len(catalog.types) == 5
-    types = list(catalog.types.values())
     assert abs(sum(catalog.probabilities) - 1.0) < 1e-6  # normalized for spawning
     values = {name: t.value for name, t in catalog.types.items()}
     assert values["normal"] == 10

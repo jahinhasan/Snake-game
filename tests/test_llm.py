@@ -11,7 +11,6 @@ import json
 
 import pytest
 
-from snake_arena.config import LLMConfig
 from snake_arena.llm.ollama_client import (
     OllamaBadResponse,
     OllamaClient,
