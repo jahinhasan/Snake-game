@@ -74,6 +74,7 @@ class App:
         self.audio = AudioManager(config.audio)
         self.running = True
         self.screens: list[Screen] = []
+        self._fade = 0.0  # 1 = fully dark: decays after each screen change
         self._llm_client: OllamaClient | None = None
         self._llm_worker: StrategyWorker | None = None
         self._rl_agent_cache: dict[str, RLAgent] = {}
@@ -85,6 +86,7 @@ class App:
             self.screens[-1].on_exit()
         self.screens.append(screen)
         screen.on_enter()
+        self._fade = 1.0
 
     def pop_screen(self) -> None:
         if self.screens:
@@ -92,6 +94,7 @@ class App:
             self.screens.pop()
         if self.screens:
             self.screens[-1].on_enter()
+            self._fade = 0.8
 
     def replace_screen(self, screen: Screen) -> None:
         while self.screens:
@@ -155,6 +158,11 @@ class App:
             screen = self.screens[-1]
             screen.update(dt)
             screen.draw(self.screen)
+            if self._fade > 0.0:
+                self._fade = max(0.0, self._fade - dt * 6.0)  # ~0.17s fade-in
+                overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+                overlay.fill((5, 8, 12, int(self._fade * 255)))
+                self.screen.blit(overlay, (0, 0))
             pygame.display.flip()
         self.shutdown()
 
