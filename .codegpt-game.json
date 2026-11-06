@@ -1,0 +1,13 @@
+{
+  "name": "snake-arena",
+  "engine": "generic",
+  "launch": {
+    "cmd": ".venv/bin/python",
+    "args": ["main.py"]
+  },
+  "log": {
+    "stdout": true,
+    "paths": ["data/logs/app.log"]
+  },
+  "sourceRoots": ["src"]
+}
