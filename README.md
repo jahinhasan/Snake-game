@@ -1,5 +1,7 @@
 # LLM-Enhanced Intelligent Snake Arena
 
+[![CI](https://github.com/jahinhasan/Snake-game/actions/workflows/ci.yml/badge.svg)](https://github.com/jahinhasan/Snake-game/actions/workflows/ci.yml)
+
 A polished, research-grade Snake game where classical search agents, a PyTorch
 DQN, and an optional locally-hosted LLM strategic planner (Ollama) play on the
 same grid — every AI action passes through an independent safety validator
@@ -9,6 +11,10 @@ Built as an academic project: real algorithms, honest reporting (untrained
 networks are labelled as such; LLM fallback is labelled as fallback), and
 benchmark artifacts (JSON/CSV/PNG) generated from actual runs, never typed in
 by hand.
+
+| Gameplay (AI vs AI) | Menu |
+| --- | --- |
+| ![AI vs AI arena with diagnostics](assets/images/arena.png) | ![Main menu](assets/images/menu.png) |
 
 ---
 
@@ -23,6 +29,9 @@ by hand.
 - Modes: human vs AI, AI vs AI, and a round-robin tournament runner.
 - Pause, restart, speed slider, seed control, keyboard controls
   (arrows / WASD, Space = pause).
+- Polished rendering: smoothly interpolated snake bodies with gradients,
+  glow + pulse effects, particle bursts, floating score popups, screen shake,
+  screen fade transitions — all pure pygame, no image assets.
 
 **AI**
 - **Rule-based** — weighted heuristics (food value, distance, danger, trap
@@ -44,31 +53,36 @@ by hand.
   counted and displayed.
 
 **UI (7 screens)**
-Menu · Mode select · Arena (with AI diagnostics overlays: chosen path,
-danger zones, target, rejected moves, live Q-values) · RL training dashboard ·
-Benchmark dashboard (solo runs + tournaments, progress bar, cancellable) ·
-Settings · Statistics & history.
+Menu (with a live AI game playing dimmed in the background) · Mode select ·
+Arena (with AI diagnostics overlays: chosen path, danger zones, target,
+rejected moves, live Q-values) · RL training dashboard · Benchmark dashboard
+(solo runs + tournaments, progress bar, cancellable) · Settings · Statistics
+& history.
 
 **Evaluation**
 - Identical per-index seeds across agents, so score differences are policy
   differences, not luck.
 - Artifacts per run: `results.json`, `summary.csv`, `records.csv`, and score /
-  survival / food-type charts.
+  survival / food-type charts. A reference benchmark session (7 agents × 20
+  episodes) and the trained checkpoint ship with the repo under
+  `data/benchmarks/` and `models/`.
 - Post-game LLM analysis (clearly marked as model-generated) when Ollama is
   available; a deterministic summary otherwise.
 
 **Reliability**
 - Atomic config/history saves with corrupt-file quarantine and recovery.
 - The game runs fully without Ollama — LLM off is the default configuration.
-- 101 automated tests (engine, food, pathfinding, safety, RL, LLM client with
+- 107 automated tests (engine, food, pathfinding, safety, RL, LLM client with
   a fake transport, decision manager, benchmark, persistence, integration,
   headless UI smoke tests): `pytest` passes with no network and no Ollama.
+- CI (GitHub Actions) runs the suite + ruff on Python 3.11–3.14 (Linux) and
+  3.14 (Windows) with CPU-only torch.
 
 ---
 
 ## Requirements
 
-- Python **3.10+** (developed and tested on **3.14**)
+- Python **3.11+** (developed and tested on **3.14**)
 - CPU is sufficient for everything; CUDA torch works automatically if present
 - Optional: [Ollama](https://ollama.com) with `ollama pull qwen3:4b`
 
@@ -104,8 +118,8 @@ dependencies, installs Ollama + pulls `qwen3:4b`, and starts the game. See
 [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for the manual equivalent.
 **Honest disclosure:** these scripts were authored for Windows but this
 project was developed and tested on Arch Linux only — the Windows path has
-not been executed by the author (the test suite itself *is* exercised on
-Windows by CI).
+not been executed on real Windows hardware (the test suite itself *is*
+exercised on Windows by CI).
 
 ## Enabling the LLM planner
 
@@ -138,9 +152,9 @@ src/snake_arena/
   rl/                    network, trainer, rewards, checkpoints
   evaluation/            benchmark runner, metrics, experiment artifacts
   persistence/           atomic storage, game history
-  ui/                    app shell + 7 screens, widgets, theme
+  ui/                    app shell + 7 screens, widgets, theme, effects
   utils/                 paths, logging helpers
-tests/                   101 tests, fully offline
+tests/                   107 tests, fully offline
 docs/                    architecture, algorithms, RL guide, experiments, Windows setup, report
 ```
 
@@ -150,7 +164,7 @@ docs/                    architecture, algorithms, RL guide, experiments, Window
 .venv/bin/python -m pytest tests/ -q
 ```
 
-Measured on the development machine: **101 passed** in ~5.5 s, no network, no
+Measured on the development machine: **107 passed** in ~9 s, no network, no
 GPU, no Ollama required.
 
 ## Documentation
@@ -163,12 +177,13 @@ GPU, no Ollama required.
 
 ## Known limitations (honest list)
 
-- Trained here for only **40 episodes** (a functional check, not convergence):
-  the shipped checkpoint plays visibly worse than A\*. Longer training is a
-  command away and is reported honestly by the tooling.
+- The shipped DQN checkpoint was trained for **640 episodes** on CPU — it is
+  competitive with the search agents in the reference benchmark (mean score
+  2275 vs A\* 2113, BFS 2095; hybrid 2466 leads), but it is not converged;
+  longer training is one command away and is reported honestly by the tooling.
 - The LLM path was verified with a programmable fake transport + fallback
-  logic; **Ollama was not installed on the development machine**, so no
-  LLM-generated gameplay or narratives are included in the results.
-- **Windows scripts are untested** (development happened on Arch Linux).
+  logic; the reference benchmark ran with `llm_available: false`, so no
+  LLM-generated gameplay is included in those numbers.
+- **Windows scripts are untested on real hardware** (development happened on
+  Arch Linux; CI covers the Python code on `windows-latest`).
 - Single machine, local-only: no networking, no accounts.
-# Snake-game
