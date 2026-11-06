@@ -1,0 +1,7 @@
+# Batch files must be CRLF on checkout: cmd.exe's label/goto parsing is
+# unreliable with LF-only files, and the repo is authored from Linux.
+*.bat text eol=crlf
+
+# Keep the Unix scripts LF everywhere, whatever the committer's git config.
+*.sh text eol=lf
+*.ps1 text eol=crlf
