@@ -33,18 +33,29 @@ from .conftest import make_engine
 
 
 class FakeTransport:
-    """Programmable stand-in for the HTTP transport."""
+    """Programmable stand-in for the HTTP transport.
 
-    def __init__(self, responses: list | None = None, fail_first: int = 0):
+    ``models`` auto-answers /api/tags probes without consuming the scripted
+    ``responses`` queue (used by chat tests, since chat now resolves the
+    model first). Pass ``models=None`` to make /api/tags consume from the
+    scripted queue instead (used by the availability tests).
+    """
+
+    def __init__(self, responses: list | None = None, fail_first: int = 0,
+                 models: list[str] | tuple[str, ...] | None = ("qwen3:4b",)):
         self.calls: list[tuple[str, bytes | None, float]] = []
         self.responses = list(responses or [])
         self.fail_first = fail_first
+        self.models = list(models) if models is not None else None
 
     def __call__(self, path: str, payload: bytes | None, timeout: float):
         self.calls.append((path, payload, timeout))
         if self.fail_first > 0:
             self.fail_first -= 1
             raise OllamaUnavailable("connection refused (fake)")
+        if path.startswith("/api/tags") and self.models is not None:
+            body = json.dumps({"models": [{"name": m} for m in self.models]})
+            return 200, body.encode()
         if not self.responses:
             raise AssertionError("unexpected extra transport call")
         item = self.responses.pop(0)
@@ -71,7 +82,7 @@ def make_client(transport) -> OllamaClient:
 
 def test_is_available_true_and_models_listed():
     tags = (200, json.dumps({"models": [{"name": "qwen3:4b"}]}).encode())
-    transport = FakeTransport([tags, tags])  # one probe + one list_models call
+    transport = FakeTransport([tags, tags], models=None)  # scripted /api/tags
     client = make_client(transport)
     ok, detail = client.is_available()
     assert ok and "qwen3:4b" in detail
@@ -80,7 +91,7 @@ def test_is_available_true_and_models_listed():
 
 
 def test_is_available_reports_unreachable():
-    client = make_client(FakeTransport(fail_first=99))
+    client = make_client(FakeTransport(fail_first=99, models=None))
     ok, detail = client.is_available()
     assert not ok
     assert "refused" in detail
@@ -94,7 +105,8 @@ def test_chat_json_returns_parsed_object():
     client = make_client(transport)
     obj = client.chat_json("system prompt", "user prompt")
     assert obj["strategy"] == "defensive"
-    path, payload, _timeout = transport.calls[0]
+    chat_calls = [c for c in transport.calls if c[0] == "/api/chat"]
+    path, payload, _timeout = chat_calls[0]
     assert path == "/api/chat"
     body = json.loads(payload.decode())
     assert body["format"] == "json" and body["stream"] is False
@@ -123,7 +135,67 @@ def test_chat_retries_garbage_output_then_raises():
     client = make_client(transport)
     with pytest.raises(OllamaBadResponse):
         client.chat_json("s", "u")
-    assert len(transport.calls) == 2  # one retry (max_retries=1), then honest failure
+    chat_calls = [c for c in transport.calls if c[0] == "/api/chat"]
+    assert len(chat_calls) == 2  # one retry (max_retries=1), then honest failure
+
+
+# -- small-model fallback (low-RAM machines) -------------------------------------
+
+def _ok_chat() -> tuple[int, bytes]:
+    return (200, json.dumps({"message": {"content": json.dumps(VALID_STRATEGY)}}).encode())
+
+
+def test_chat_falls_back_to_installed_smaller_model():
+    """Requested qwen3:4b absent, qwen3:0.6b installed -> use it and say so."""
+    transport = FakeTransport(models=["qwen3:0.6b", "llama3:8b"], responses=[_ok_chat()])
+    client = make_client(transport)
+    obj = client.chat_json("s", "u")
+    assert obj["strategy"] == "defensive"
+    chat_payload = json.loads(next(c[1] for c in transport.calls if c[0] == "/api/chat").decode())
+    assert chat_payload["model"] == "qwen3:0.6b"
+    assert client.requested_model == "qwen3:4b"  # original request is kept for display
+    assert client.model == "qwen3:0.6b"
+    assert client.model_note is not None and "0.6b" in client.model_note
+
+
+def test_chat_keeps_requested_model_when_installed():
+    transport = FakeTransport(models=["qwen3:4b", "llama3:8b"], responses=[_ok_chat()])
+    client = make_client(transport)
+    client.chat_raw("s", "u")
+    assert client.model == "qwen3:4b"
+    assert client.model_note is None
+
+
+def test_resolve_family_match_when_fallbacks_missing():
+    """No configured candidate installed, but another qwen3 tag exists."""
+    transport = FakeTransport(models=["qwen3:8b"], responses=[_ok_chat()])
+    client = make_client(transport)
+    client.chat_raw("s", "u")
+    assert client.model == "qwen3:8b"
+    assert client.model_note is not None and "same-family" in client.model_note
+
+
+def test_resolve_unreachable_server_keeps_requested_model():
+    """Server down or list unreadable: behave exactly like before the feature."""
+    transport = FakeTransport(
+        [OllamaUnavailable("connection refused (fake)"), _ok_chat()], models=None)
+    client = make_client(transport)
+    content = client.chat_raw("s", "u")
+    assert client.model == "qwen3:4b"
+    assert client.model_note is None
+    assert json.loads(content) == VALID_STRATEGY
+
+
+def test_config_fallback_models_validate_and_load():
+    from snake_arena.config import AppConfig
+
+    cfg = AppConfig()
+    assert cfg.llm.fallback_models == ["qwen3:1.7b", "qwen3:0.6b"]
+    raw = {"llm": {"fallback_models": ["qwen3:0.6b", "qwen3:4b", "", 42, "qwen3:4b"]}}
+    cfg._apply_dict(raw)
+    cfg.validate()
+    # dedup vs primary, drop empty/non-string entries, keep order
+    assert cfg.llm.fallback_models == ["qwen3:0.6b"]
 
 
 def test_extract_json_object_variants():

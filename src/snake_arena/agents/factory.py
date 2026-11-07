@@ -66,6 +66,7 @@ def build_llm_client(config: AppConfig) -> OllamaClient | None:
         max_retries=config.llm.max_retries,
         temperature=config.llm.temperature,
         max_tokens=config.llm.max_tokens,
+        fallback_models=config.llm.fallback_models,
     )
 
 

@@ -6,8 +6,8 @@ rem  On a FRESH clone this single file does everything:
 rem    1. Finds Python 3.11+ (py launcher, PATH, or installs it via winget)
 rem    2. Creates .venv and downloads ALL dependencies (CPU PyTorch,
 rem       pygame-ce, numpy, matplotlib) - happens one time
-rem    3. Installs Ollama via winget if missing and pulls qwen3:4b (~2.4 GB)
-rem       so the LLM planner works - OPTIONAL, never blocks the game
+rem    3. Installs Ollama via winget if missing and pulls a qwen3 model sized
+rem       to this machine's RAM (0.6b / 1.7b / 4b) - OPTIONAL, never blocks
 rem    4. Starts the game
 rem
 rem  Every later run: jumps straight to step 4 and starts instantly.
@@ -104,16 +104,26 @@ if errorlevel 1 (
     start "ollama-serve" /min "%OLLAMA_EXE%" serve
     timeout /t 4 /nobreak >nul
 )
-"%OLLAMA_EXE%" list 2>nul | findstr /c:"qwen3:4b" >nul
+rem Pick a model this machine can actually run: qwen3:4b wants ~8+ GB free
+rem RAM; small machines get 1.7b/0.6b (the game also auto-falls back at
+rem runtime to any installed qwen3 model, so this is belt and braces).
+set "RAM_GB="
+for /f %%A in ('powershell -NoProfile -Command "[int][math]::Ceiling((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)" 2^>nul') do set "RAM_GB=%%A"
+if not defined RAM_GB set "RAM_GB=8"
+set "OLLAMA_MODEL=qwen3:0.6b"
+if %RAM_GB% GEQ 6 set "OLLAMA_MODEL=qwen3:1.7b"
+if %RAM_GB% GEQ 10 set "OLLAMA_MODEL=qwen3:4b"
+"%OLLAMA_EXE%" list 2>nul | findstr /c:"%OLLAMA_MODEL%" >nul
 if errorlevel 1 (
-    echo  Pulling qwen3:4b for the LLM planner - about 2.4 GB, ONE time...
-    "%OLLAMA_EXE%" pull qwen3:4b
+    echo  Pulling %OLLAMA_MODEL% for the LLM planner - RAM detected: %RAM_GB% GB.
+    echo  qwen3 sizes: 0.6b ~0.5 GB, 1.7b ~1.4 GB, 4b ~2.6 GB. ONE time download.
+    "%OLLAMA_EXE%" pull %OLLAMA_MODEL%
     if errorlevel 1 (
         echo  [note] Model pull failed - the game still runs; the LLM planner
         echo         falls back to its built-in strategy.
     )
 ) else (
-    echo  qwen3:4b already present.
+    echo  %OLLAMA_MODEL% already present.
 )
 
 rem ---- 4. launch the game -----------------------------------------------------

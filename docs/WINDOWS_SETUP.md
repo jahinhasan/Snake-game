@@ -17,9 +17,12 @@ Just **double-click `run_windows.bat`**. On the first run it:
 2. creates `.venv` and downloads **everything at once** (CPU PyTorch,
    pygame-ce, numpy, matplotlib);
 3. installs **Ollama** via `winget` if missing, starts its server, and pulls
-   `qwen3:4b` (~2.4 GB, one time) so the LLM planner works — strictly
-   optional: if any of this fails the game still runs with the planner's
-   built-in fallback strategy;
+   a **qwen3 model sized to the machine's RAM** — `qwen3:4b` (~2.6 GB) on
+   machines with 10+ GB RAM, `qwen3:1.7b` (~1.4 GB) on 6–10 GB, and
+   `qwen3:0.6b` (~0.5 GB) below that — one time, strictly optional: if any
+   of this fails the game still runs with the planner's built-in fallback
+   strategy, and at runtime the game also auto-switches to any installed
+   smaller `qwen3` model;
 4. starts the game.
 
 Every later run jumps straight to step 4 and starts instantly. If Python is

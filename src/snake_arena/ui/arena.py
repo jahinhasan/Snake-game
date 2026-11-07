@@ -702,7 +702,13 @@ class ArenaScreen(Screen):
                     if log.llm_error:
                         lines.append(f"  llm: {log.llm_error[:60]}")
                     elif log.strategy_source == "llm":
-                        lines.append(f"  llm: ok {log.latency_ms:.0f}ms")
+                        client = getattr(manager, "llm_client", None)
+                        model = getattr(client, "model", "") if client else ""
+                        base = f"  llm: ok {log.latency_ms:.0f}ms"
+                        lines.append(f"{base} ({model})" if model else base)
+                        note = getattr(client, "model_note", None) if client else None
+                        if note:
+                            lines.append(f"  llm note: {note}")
                 for note in log.notes[-2:]:
                     lines.append(f"  note: {note[:64]}")
             elif decision is None:

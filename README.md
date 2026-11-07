@@ -44,7 +44,11 @@ by hand.
   postures (greedy / balanced / defensive / survival, food target, risk
   tolerance) every few seconds. It never blocks the game loop: cached,
   rate-limited, background-threaded, with a deterministic fallback strategy
-  when the server is absent or slow.
+  when the server is absent or slow. On low-RAM machines the client
+  **auto-falls back to smaller models**: if `qwen3:4b` is not installed it
+  tries `qwen3:1.7b`, then `qwen3:0.6b` (configurable via
+  `llm.fallback_models`), then any other installed `qwen3` tag — and the
+  arena diagnostics show which model actually answered.
 - **Hybrid** — LLM posture modulates the weights between A\* and DQN votes;
   documented deterministic arbitration.
 - **Safety checker (mandatory)** — every proposed action from every agent is
@@ -72,7 +76,7 @@ rejected moves, live Q-values) · RL training dashboard · Benchmark dashboard
 **Reliability**
 - Atomic config/history saves with corrupt-file quarantine and recovery.
 - The game runs fully without Ollama — LLM off is the default configuration.
-- 107 automated tests (engine, food, pathfinding, safety, RL, LLM client with
+- 112 automated tests (engine, food, pathfinding, safety, RL, LLM client with
   a fake transport, decision manager, benchmark, persistence, integration,
   headless UI smoke tests): `pytest` passes with no network and no Ollama.
 - CI (GitHub Actions) runs the suite + ruff on Python 3.11–3.14 (Linux) and
@@ -114,7 +118,8 @@ checkpoints in `models/`.
 
 **One file is enough:** on a fresh clone, double-click `run_windows.bat` —
 it installs Python (via winget, if missing), creates `.venv`, downloads all
-dependencies, installs Ollama + pulls `qwen3:4b`, and starts the game. See
+dependencies, installs Ollama + pulls a qwen3 model **sized to the machine's
+RAM** (0.6b / 1.7b / 4b), and starts the game. See
 [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for the manual equivalent.
 **Honest disclosure:** these scripts were authored for Windows but this
 project was developed and tested on Arch Linux only — the Windows path has
@@ -127,6 +132,20 @@ exercised on Windows by CI).
 ollama serve                     # if not already running as a service
 ollama pull qwen3:4b
 ```
+
+**Low-RAM machine?** You don't need the big model. Pull any one of them and
+the game adapts automatically:
+
+```bash
+ollama pull qwen3:0.6b           # ~0.5 GB download; runs in well under 1 GB RAM
+```
+
+The client asks the server for installed tags before the first inference and
+picks the best available model: `llm.model` (`qwen3:4b`) first, then the
+`llm.fallback_models` chain (`["qwen3:1.7b", "qwen3:0.6b"]` by default), then
+any other installed `qwen3:*` tag. The switch is announced in the arena's AI
+diagnostics (`llm note: requested 'qwen3:4b' is not installed; using smaller
+fallback 'qwen3:0.6b'`), so nothing happens silently.
 
 Then either set `llm.enabled = true` in Settings (or `config/default.json`),
 or set the environment variable `SNAKE_ARENA_LLM=1` style overrides — the
@@ -154,7 +173,7 @@ src/snake_arena/
   persistence/           atomic storage, game history
   ui/                    app shell + 7 screens, widgets, theme, effects
   utils/                 paths, logging helpers
-tests/                   107 tests, fully offline
+tests/                   112 tests, fully offline
 docs/                    architecture, algorithms, RL guide, experiments, Windows setup, report
 ```
 
@@ -164,7 +183,7 @@ docs/                    architecture, algorithms, RL guide, experiments, Window
 .venv/bin/python -m pytest tests/ -q
 ```
 
-Measured on the development machine: **107 passed** in ~9 s, no network, no
+Measured on the development machine: **112 passed** in ~9 s, no network, no
 GPU, no Ollama required.
 
 ## Documentation

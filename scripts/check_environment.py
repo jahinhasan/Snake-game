@@ -118,13 +118,16 @@ def run_checks(config) -> int:
             timeout=config.llm.timeout_seconds,
             connect_timeout=config.llm.connection_timeout_seconds,
             max_retries=config.llm.max_retries,
+            fallback_models=config.llm.fallback_models,
         )
         started = time.time()
         ok, detail = client.is_available()
         if ok:
             has_model, model_note = client.has_model()
             if has_model:
-                _line("Ollama", True, f"{model_note} ({time.time() - started:.1f}s)")
+                client.resolve_model()
+                suffix = f"; {client.model_note}" if client.model_note else ""
+                _line("Ollama", True, f"using model '{client.model}'{suffix} ({time.time() - started:.1f}s)")
             else:
                 _line("Ollama server", True, f"reachable, but {model_note} - LLM agents will use the fallback strategy")
         else:

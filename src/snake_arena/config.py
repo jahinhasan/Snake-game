@@ -133,6 +133,9 @@ class LLMConfig:
     enabled: bool = True
     host: str = "http://127.0.0.1:11434"
     model: str = "qwen3:4b"
+    # Tried in order when ``model`` is not installed, so low-RAM machines can
+    # still run a planner (qwen3:0.6b needs well under 1 GB of free memory).
+    fallback_models: list[str] = field(default_factory=lambda: ["qwen3:1.7b", "qwen3:0.6b"])
     timeout_seconds: float = 8.0
     connection_timeout_seconds: float = 2.5
     min_interval_seconds: float = 3.0
@@ -150,6 +153,16 @@ class LLMConfig:
         self.max_retries = _clamp_int(self.max_retries, 0, 3, "llm.max_retries")
         self.temperature = _clamp(self.temperature, 0.0, 1.5, "llm.temperature")
         self.max_tokens = _clamp_int(self.max_tokens, 40, 2048, "llm.max_tokens")
+        # Keep only well-formed non-empty names; drop entries equal to the
+        # primary model and cap the chain length.
+        seen = {self.model}
+        kept: list[str] = []
+        for name in self.fallback_models:
+            if (isinstance(name, str) and name.strip() and any(ch.isalpha() for ch in name)
+                    and name not in seen and len(kept) < 6):
+                kept.append(name.strip())
+                seen.add(name)
+        self.fallback_models = kept
         self.analysis_max_tokens = _clamp_int(self.analysis_max_tokens, 40, 4096, "llm.analysis_max_tokens")
         host = str(self.host).strip()
         if not host.startswith(("http://", "https://")):
@@ -430,6 +443,8 @@ class AppConfig:
                             setattr(section, key, [int(h) for h in val][:3] if isinstance(val, list) else current)
                         elif section_name == "benchmark" and key == "agents":
                             setattr(section, key, [str(a) for a in val] if isinstance(val, list) else current)
+                        elif section_name == "llm" and key == "fallback_models":
+                            setattr(section, key, [str(m) for m in val] if isinstance(val, list) else current)
                     elif isinstance(current, str):
                         setattr(section, key, str(val))
                     elif current is None:
